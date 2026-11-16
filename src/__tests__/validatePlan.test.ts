@@ -58,10 +58,7 @@ describe('validatePlan — repairs', () => {
   });
 
   it('enforces 10-minute buffer between blocks', () => {
-    const r = run(
-      [task({ id: 'a' }), task({ id: 'b' })],
-      [block('a', at(MON, '08:00'), 60), block('b', at(MON, '09:00'), 60)],
-    );
+    const r = run([task({ id: 'a' }), task({ id: 'b' })], [block('a', at(MON, '08:00'), 60), block('b', at(MON, '09:00'), 60)]);
     const b = r.blocks.find((x) => x.taskId === 'b')!;
     expect(b.repaired).toBe(true);
     expect(b.start - r.blocks[0]!.end).toBeGreaterThanOrEqual(10 * MINUTE);
@@ -105,12 +102,12 @@ describe('validatePlan — repairs', () => {
     const c = ctx();
     const tasks = ['a', 'b', 'c'].map((id) => task({ id, remainingMinutes: 90 }));
     // 3 × 80 min with only 10-min gaps → 4h continuous; third must move.
-    const r = run(tasks, [block('a', at(MON, '08:00'), 80), block('b', at(MON, '09:30'), 80), block('c', at(MON, '13:00'), 80)], { ctx: c });
-    const proposed = run(
-      tasks,
-      [block('a', at(MON, '13:00'), 80), block('b', at(MON, '14:30'), 80), block('c', at(MON, '16:00'), 60)],
-      { ctx: c },
-    );
+    const r = run(tasks, [block('a', at(MON, '08:00'), 80), block('b', at(MON, '09:30'), 80), block('c', at(MON, '13:00'), 80)], {
+      ctx: c,
+    });
+    const proposed = run(tasks, [block('a', at(MON, '13:00'), 80), block('b', at(MON, '14:30'), 80), block('c', at(MON, '16:00'), 60)], {
+      ctx: c,
+    });
     expect(r.blocks.every((b) => !b.repaired)).toBe(true); // 08:00–10:50 = 160 min chain, then lunch gap
     const third = proposed.blocks.find((b) => b.taskId === 'c')!;
     expect(third.repaired).toBe(true);
@@ -126,7 +123,10 @@ describe('validatePlan — drops and warnings', () => {
   });
 
   it('drops a block when no valid slot exists, with a warning', () => {
-    const c = ctx({ range: { start: at(MON, '00:00'), end: at(MON, '24:00') }, busy: [{ start: at(MON, '08:00'), end: at(MON, '17:00') }] });
+    const c = ctx({
+      range: { start: at(MON, '00:00'), end: at(MON, '24:00') },
+      busy: [{ start: at(MON, '08:00'), end: at(MON, '17:00') }],
+    });
     const r = run([task({ id: 'w' })], [block('w', at(MON, '09:00'), 60)], { ctx: c });
     expect(r.blocks).toEqual([]);
     expect(r.warnings.map((w) => w.kind)).toContain('dropped');
@@ -224,7 +224,10 @@ describe('greedyPlan → validatePlan (property test on seed-like data)', () => 
 
     const plan = greedyPlan({ ctx: c, capacity, existingBlocks: [], tasks });
     const byId = new Map(tasks.map((t) => [t.id, t]));
-    invariants(c, plan.blocks.map((b) => ({ ...b, space: byId.get(b.taskId)!.space })));
+    invariants(
+      c,
+      plan.blocks.map((b) => ({ ...b, space: byId.get(b.taskId)!.space })),
+    );
 
     const report = validatePlan({ ctx: c, capacity, existingBlocks: [], tasks, proposed: plan.blocks });
     expect(report.dropped).toEqual([]);

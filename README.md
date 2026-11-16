@@ -14,7 +14,7 @@ Ba vấn đề cốt lõi: dồn quá nhiều việc vào một ngày → giới
 | Giai đoạn | Nội dung | Trạng thái |
 |---|---|---|
 | **1. Nền móng** | Expo + Router + TypeScript strict, design tokens, i18n tiếng Việt, điều hướng (tab bar điện thoại / sidebar desktop, phím tắt), toàn bộ schema Supabase + RLS + tìm kiếm + pg_cron, thư viện thuần đã kiểm thử: `slots`, `capacity`, `priority`, `validatePlan`, `greedyPlan`, bộ lập lịch thông báo cục bộ | ✅ Xong |
-| 2. Dữ liệu & Việc | Đăng nhập (Apple/Google), truy vấn có kiểu, Việc/Ghi chú CRUD, Quick Add + Edge Function `parse-task` (Gemini → Groq), ≥ 20 fixture tiếng Việt, hàng đợi offline | ⏳ |
+| **2. Dữ liệu & Việc** | Đăng nhập Apple/Google, truy vấn có kiểu + hàng đợi ghi offline, Việc (nhóm, lọc, chi tiết, việc con, liên kết), Ghi chú (danh sách, soạn thảo tự lưu, checklist → việc), Hôm nay dùng dữ liệu thật, Tìm kiếm, Môn học & dự án, Quick Add + Edge Function `parse-task` (Gemini → Groq), 34 fixture ngày giờ tiếng Việt | ✅ Xong |
 | 3. Lịch & AI xếp lịch | `gcal-auth`, `gcal-sync`, `propose-plan`, màn hình duyệt đề xuất, Hoàn tác, màn Lịch (Ngày/3 ngày/Tuần), kéo thả | ⏳ |
 | 4. Nhắc nhở | Thông báo cục bộ (≤ 50), `push-dispatch`, bản tóm tắt sáng / tổng kết tối | ⏳ |
 | 5. Ghi âm & Ghi chú giàu nội dung | Trình soạn thảo, ảnh, link preview, ghi âm nền theo đoạn, `transcribe-audio`, tóm tắt | ⏳ |
@@ -23,6 +23,29 @@ Ba vấn đề cốt lõi: dồn quá nhiều việc vào một ngày → giới
 Các màn hình chưa tới giai đoạn của mình hiển thị trạng thái "Đang xây dựng" — không có nút giả.
 
 ---
+
+## Quick Add: AI tách việc, code tính ngày giờ
+
+`parse-task` gửi câu bạn gõ cho AI để **tách thành các việc** và trích nguyên văn cụm từ chỉ thời hạn ("thứ 6 tuần sau", "trước 5h chiều") và thời lượng ("khoảng 3 tiếng"). Ngày giờ và số phút **do code tính** (`supabase/functions/_shared/vi-parse.ts`), không để AI tự cộng ngày. Quy ước:
+
+- Chỉ có ngày → 23:59 ngày đó. "tối nay" → 22:00, "sáng mai" → 12:00 hôm sau (cuối buổi).
+- Giờ 1–6 không kèm sáng/chiều → buổi chiều ("họp 2h" = 14:00). Chỉ có giờ đã qua → ngày mai.
+- "thứ 6"/"thứ 6 này" → thứ 6 gần nhất (tính cả hôm nay); "thứ 6 tuần sau" → thứ 6 của tuần kế (tuần bắt đầu thứ Hai).
+- "cuối tuần" → Chủ Nhật tuần này; "đầu tháng sau" → ngày 1 tháng sau; "cuối tháng" → ngày cuối tháng.
+
+Môn học/dự án được khớp theo tên (không dấu); nếu AI và từ khóa không thống nhất Học hay Việc, chip không gian được tô viền vàng để bạn xác nhận. Khi AI lỗi/hết lượt/ngoại tuyến: "Lưu vào hộp việc" giữ nguyên câu với nhãn **Chưa phân tích**, mở việc đó để "Phân tích lại bằng AI".
+
+Đánh giá thật với Gemini/Groq (tùy chọn):
+```bash
+GEMINI_API_KEY=… GEMINI_MODEL=… GROQ_API_KEY=… GROQ_MODEL=… \
+  deno run --allow-env --allow-net --config supabase/functions/parse-task/deno.json scripts/eval-parse.ts
+```
+
+## Ngoại tuyến
+
+- Đọc: Hôm nay, Việc, Ghi chú được cache (AsyncStorage / localStorage) 7 ngày.
+- Ghi: tạo/sửa/xong/xóa việc, sửa ghi chú… được xếp hàng theo đúng thứ tự (một scope duy nhất), lưu lại kể cả khi đóng app, và gửi khi có mạng. Header hiện "Chờ đồng bộ · n". ID tạo ở máy nên việc con/liên kết tạo offline vẫn gắn đúng.
+- AI: hiện "Cần kết nối mạng".
 
 ## Cấu trúc
 
@@ -45,6 +68,9 @@ src/
   __tests__/              Jest
 supabase/
   migrations/             schema, RLS, tìm kiếm, cron
+  functions/
+    _shared/              ai-provider (Gemini/Groq + fallback), vi-parse, parse-task-core, http, context
+    parse-task/           Edge Function Quick Add
 scripts/db-check/         chạy migrations trên Postgres tạm + kiểm tra RLS
 ```
 
@@ -76,8 +102,11 @@ npm run ios                 # cần development build (xem EAS bên dưới)
 ## Kiểm thử
 
 ```bash
-npm test                    # Jest: tz, slots, capacity, priority, validatePlan/greedyPlan, thông báo
+npm test                    # Jest: tz, slots, capacity, priority, validatePlan/greedyPlan, thông báo,
+                            #       ngày giờ tiếng Việt, pipeline parse-task (provider giả), nhóm việc, checklist
 npm run typecheck           # tsc --noEmit
+npm run lint                # ESLint (eslint-config-expo)
+npm run check:functions     # deno check Edge Functions (cần Deno)
 cd scripts/db-check && npm install && npm run check   # migrations + RLS trên Postgres thật
 ```
 
@@ -101,7 +130,16 @@ cd scripts/db-check && npm install && npm run check   # migrations + RLS trên P
    select vault.create_secret('<service-role-key>', 'service_role_key');
    ```
    Cron gọi `gcal-sync` mỗi 15 phút và `push-dispatch` mỗi 5 phút. Trước khi các function đó được deploy (giai đoạn 3–4) lời gọi chỉ trả 404 và bị bỏ qua.
-5. Auth → Providers: bật **Apple** và **Google** (chi tiết ở giai đoạn 2). Thêm `nhip://` vào Redirect URLs.
+5. Auth → URL Configuration → Redirect URLs: thêm `nhip://auth/callback` (iPhone) và địa chỉ web của bạn (vd. `https://nhip.example.com`, `http://localhost:8081`).
+6. Auth → Providers:
+   - **Google**: tạo OAuth client loại *Web application* trong Google Cloud (có thể dùng chung project với Calendar ở giai đoạn 3), redirect URI `https://<project-ref>.supabase.co/auth/v1/callback`, dán Client ID/Secret vào Supabase.
+   - **Apple**: trên iPhone app dùng nút đăng nhập Apple gốc (`signInWithIdToken`) — thêm bundle id `app.nhip.planner` (và `.preview`, `.dev`) vào ô *Client IDs* của provider Apple. Đăng nhập Apple trên web cần thêm Services ID + khóa `.p8` (xem tài liệu Supabase "Login with Apple"); nếu chỉ dùng web, đăng nhập Google là đủ.
+7. Deploy Edge Function và đặt secrets:
+   ```bash
+   npx supabase secrets set GEMINI_API_KEY=… GEMINI_MODEL=… GROQ_API_KEY=… GROQ_MODEL=… AI_DAILY_CALL_LIMIT=200
+   npx supabase functions deploy parse-task
+   ```
+   Lấy key Gemini miễn phí tại aistudio.google.com, key Groq tại console.groq.com. Đặt `GEMINI_MODEL` là model Flash miễn phí mới nhất đang có trong AI Studio; `GROQ_MODEL` là một model chat hỗ trợ JSON mode.
 
 Bucket lưu trữ `attachments` được tạo ở chế độ **private**; file nằm dưới `<user_id>/…` và chỉ đọc qua signed URL.
 
@@ -157,4 +195,4 @@ Trên web, ghi âm dài và thông báo cục bộ bị giới hạn — app s�
 
 ## Phím tắt (web)
 
-`N` thêm nhanh · `G` rồi `T`/`V`/`N`/`L` tới Hôm nay/Việc/Ghi chú/Lịch · `Esc` đóng · `/` tìm kiếm (giai đoạn 2)
+`N` thêm nhanh · `/` tìm kiếm · `G` rồi `T`/`V`/`N`/`L` tới Hôm nay/Việc/Ghi chú/Lịch · `Esc` đóng

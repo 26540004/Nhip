@@ -4,13 +4,7 @@
  * `checkPlacement`, so the two can never disagree about what is valid.
  */
 import { type Interval, mergeIntervals, overlaps, pad, subtractIntervals } from '../time/intervals';
-import {
-  type SlotContext,
-  type Space,
-  allowedWindows,
-  classOccurrences,
-  quietIntervals,
-} from '../time/slots';
+import { type SlotContext, type Space, allowedWindows, classOccurrences, quietIntervals } from '../time/slots';
 import { APP_TZ, MINUTE, type Instant, dateKeyOf } from '../time/tz';
 import { type CapacitySetting, type SpacedInterval, remainingCapacity, usageByDay } from './capacity';
 import type { Priority } from './priority';
@@ -109,9 +103,7 @@ export class PlacementEngine {
   }
 
   scheduledMinutesFor(taskId: string): number {
-    return this.placed
-      .filter((b) => b.taskId === taskId)
-      .reduce((sum, b) => sum + Math.round((b.end - b.start) / MINUTE), 0);
+    return this.placed.filter((b) => b.taskId === taskId).reduce((sum, b) => sum + Math.round((b.end - b.start) / MINUTE), 0);
   }
 
   /** Everything a new block must not intersect (buffers applied where they belong). */
@@ -217,11 +209,13 @@ export class PlacementEngine {
   availableBeforeDeadline(task: PlanTask, from: Instant): number {
     if (task.deadlineAt == null) return Number.POSITIVE_INFINITY;
     const window: Interval = { start: from, end: task.deadlineAt };
-    const free = this.freeFor(task.space).filter((f) => overlaps(f, window)).map((f) => ({
-      start: Math.max(f.start, window.start),
-      end: Math.min(f.end, window.end),
-      space: task.space,
-    }));
+    const free = this.freeFor(task.space)
+      .filter((f) => overlaps(f, window))
+      .map((f) => ({
+        start: Math.max(f.start, window.start),
+        end: Math.min(f.end, window.end),
+        space: task.space,
+      }));
     const freeByDay = usageByDay(free, this.tz);
     const usage = usageByDay(this.allAppBlocks(), this.tz);
     let total = 0;

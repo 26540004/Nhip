@@ -1,11 +1,4 @@
-import {
-  allowedWindows,
-  classOccurrences,
-  computeFreeSlots,
-  lunchBreaks,
-  officeSpans,
-  workWindows,
-} from '../lib/time/slots';
+import { allowedWindows, classOccurrences, computeFreeSlots, lunchBreaks, officeSpans, workWindows } from '../lib/time/slots';
 import { type Interval, overlaps, totalMinutes } from '../lib/time/intervals';
 import { at, ctx, FRI, MON, NEXT_TUE, SAT, SUN, THU, TUE } from './fixtures';
 
@@ -60,9 +53,7 @@ describe('class occurrences + exceptions', () => {
 
   it('moved class: original removed, new time added', () => {
     const c = ctx({
-      exceptions: [
-        { classSessionId: 'csdl-sat', date: SAT, type: 'moved', newStart: at(SUN, '14:00'), newEnd: at(SUN, '17:00') },
-      ],
+      exceptions: [{ classSessionId: 'csdl-sat', date: SAT, type: 'moved', newStart: at(SUN, '14:00'), newEnd: at(SUN, '17:00') }],
     });
     const occ = classOccurrences(c);
     expect(occ.find((o) => o.start === at(SAT, '08:00'))).toBeUndefined();

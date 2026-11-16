@@ -17,8 +17,8 @@ function isTyping(target: EventTarget | null): boolean {
 }
 
 /**
- * Web shortcuts (spec §F): N = quick add, G then T/V/N/L = go to section, Esc = close sheet.
- * "/" (search) is registered by the search feature when it ships.
+ * Web shortcuts (spec §F): N = quick add, / = search, G then T/V/N/L = go to section, Esc = close sheet.
+ * "/" = search.
  */
 export function useKeyboardShortcuts(): void {
   useEffect(() => {
@@ -44,6 +44,11 @@ export function useKeyboardShortcuts(): void {
       }
       if (key === 'g') {
         pendingG = Date.now();
+        return;
+      }
+      if (e.key === '/') {
+        e.preventDefault();
+        router.push('/search');
         return;
       }
       if (key === 'n') {

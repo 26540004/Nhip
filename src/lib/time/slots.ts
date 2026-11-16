@@ -7,12 +7,7 @@
  *  - Both: never overlapping Google busy times, existing accepted blocks, classes,
  *    quiet hours, or the past.
  */
-import {
-  type Interval,
-  clip,
-  mergeIntervals,
-  subtractIntervals,
-} from './intervals';
+import { type Interval, clip, mergeIntervals, subtractIntervals } from './intervals';
 import {
   APP_TZ,
   type DateKey,
@@ -152,9 +147,7 @@ export function classOccurrences(ctx: SlotContext): ClassOccurrence[] {
   const tz = ctx.tz ?? APP_TZ;
   const out: ClassOccurrence[] = [];
   const cancelled = new Set(
-    ctx.exceptions
-      .filter((e) => e.type === 'cancelled' || e.type === 'moved')
-      .map((e) => `${e.classSessionId ?? ''}|${e.date}`),
+    ctx.exceptions.filter((e) => e.type === 'cancelled' || e.type === 'moved').map((e) => `${e.classSessionId ?? ''}|${e.date}`),
   );
 
   for (const key of paddedKeys(ctx.range, tz)) {
@@ -179,9 +172,7 @@ export function classOccurrences(ctx: SlotContext): ClassOccurrence[] {
       });
     }
   }
-  return out
-    .filter((o) => o.start < ctx.range.end && ctx.range.start < o.end)
-    .sort((a, b) => a.start - b.start);
+  return out.filter((o) => o.start < ctx.range.end && ctx.range.start < o.end).sort((a, b) => a.start - b.start);
 }
 
 export function quietIntervals(ctx: SlotContext): Interval[] {

@@ -23,6 +23,7 @@ const config: ExpoConfig = {
   ios: {
     bundleIdentifier,
     supportsTablet: false,
+    usesAppleSignIn: true,
     infoPlist: {
       // Background audio so lecture recording continues with the screen locked.
       UIBackgroundModes: ['audio', 'remote-notification'],
@@ -53,6 +54,7 @@ const config: ExpoConfig = {
     ],
     'expo-secure-store',
     'expo-web-browser',
+    'expo-apple-authentication',
     [
       'expo-audio',
       {

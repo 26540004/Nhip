@@ -105,4 +105,3 @@ export function greedyPlan(input: GreedyPlanInput): GreedyPlanResult {
   }
   return { blocks, unplaced };
 }
-

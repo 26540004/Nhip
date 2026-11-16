@@ -44,7 +44,9 @@ export function AppTabBar({ state, navigateToTab }: BottomTabBarProps) {
 
   if (mode === 'desktop') {
     return (
-      <View style={[styles.sidebar, { backgroundColor: colors.surface, borderRightColor: colors.border, paddingTop: insets.top + spacing.xl }]}>
+      <View
+        style={[styles.sidebar, { backgroundColor: colors.surface, borderRightColor: colors.border, paddingTop: insets.top + spacing.xl }]}
+      >
         <AppText variant="section" style={styles.brand}>
           {vi.appName}
         </AppText>
@@ -61,7 +63,11 @@ export function AppTabBar({ state, navigateToTab }: BottomTabBarProps) {
         </Pressable>
         {items.map((it) => (
           <SideItem key={it.key} role="tab" selected={it.focused} label={it.meta.label} onPress={it.onPress}>
-            <Ionicons name={it.focused ? it.meta.iconActive : it.meta.icon} size={20} color={it.focused ? colors.primary : colors.textMuted} />
+            <Ionicons
+              name={it.focused ? it.meta.iconActive : it.meta.icon}
+              size={20}
+              color={it.focused ? colors.primary : colors.textMuted}
+            />
             <AppText variant="body" tone={it.focused ? 'heading' : 'muted'}>
               {it.meta.label}
             </AppText>
@@ -89,7 +95,11 @@ export function AppTabBar({ state, navigateToTab }: BottomTabBarProps) {
       onPress={it.onPress}
       style={styles.tab}
     >
-      <Ionicons name={it.focused ? it.meta.iconActive : it.meta.icon} size={22} color={it.focused ? colors.textHeading : colors.textMuted} />
+      <Ionicons
+        name={it.focused ? it.meta.iconActive : it.meta.icon}
+        size={22}
+        color={it.focused ? colors.textHeading : colors.textMuted}
+      />
       <AppText variant="meta" tone={it.focused ? 'heading' : 'muted'} maxFontSizeMultiplier={1.3}>
         {it.meta.label}
       </AppText>
@@ -97,7 +107,12 @@ export function AppTabBar({ state, navigateToTab }: BottomTabBarProps) {
   );
 
   return (
-    <View style={[styles.bar, { backgroundColor: colors.surface, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, spacing.sm) }]}>
+    <View
+      style={[
+        styles.bar,
+        { backgroundColor: colors.surface, borderTopColor: colors.border, paddingBottom: Math.max(insets.bottom, spacing.sm) },
+      ]}
+    >
       {left.map(renderTab)}
       <View style={styles.tab}>
         <Pressable

@@ -11,7 +11,17 @@ import { radius, spacing } from '../theme/tokens';
  * (handled by the global shortcut hook). Slide-up uses the native modal animation, which
  * respects the system reduced-motion setting.
  */
-export function Sheet({ visible, onClose, children, label }: { visible: boolean; onClose: () => void; children: ReactNode; label: string }) {
+export function Sheet({
+  visible,
+  onClose,
+  children,
+  label,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  children: ReactNode;
+  label: string;
+}) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { mode } = useResponsive();

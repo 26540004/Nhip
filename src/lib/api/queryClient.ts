@@ -1,6 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
-import { QueryClient } from '@tanstack/react-query';
+import { focusManager, onlineManager, QueryClient } from '@tanstack/react-query';
+import { AppState, Platform } from 'react-native';
+import { registerMutationDefaults } from './mutations';
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -12,10 +15,15 @@ export const queryClient = new QueryClient({
       networkMode: 'offlineFirst',
     },
     mutations: {
-      networkMode: 'offlineFirst',
+      // Paused while offline, persisted, replayed when the connection returns.
+      networkMode: 'online',
+      gcTime: 7 * 24 * 60 * 60 * 1000,
+      retry: 3,
     },
   },
 });
+
+registerMutationDefaults(queryClient);
 
 export const queryPersister = createAsyncStoragePersister({
   storage: AsyncStorage,
@@ -24,4 +32,15 @@ export const queryPersister = createAsyncStoragePersister({
 });
 
 /** Bump to invalidate persisted caches after a breaking data-shape change. */
-export const QUERY_CACHE_BUSTER = 'v1';
+export const QUERY_CACHE_BUSTER = 'v2';
+
+// Online/offline from NetInfo on native (the browser's own events are used on web).
+if (Platform.OS !== 'web') {
+  onlineManager.setEventListener((setOnline) =>
+    NetInfo.addEventListener((state) => setOnline(Boolean(state.isConnected) && state.isInternetReachable !== false)),
+  );
+  focusManager.setEventListener((handleFocus) => {
+    const sub = AppState.addEventListener('change', (s) => handleFocus(s === 'active'));
+    return () => sub.remove();
+  });
+}

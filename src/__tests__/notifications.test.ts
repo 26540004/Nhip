@@ -1,10 +1,4 @@
-import {
-  type ReminderBlock,
-  IOS_PENDING_LIMIT,
-  desiredReminders,
-  diffReminders,
-  reminderId,
-} from '../lib/notifications/local';
+import { type ReminderBlock, IOS_PENDING_LIMIT, desiredReminders, diffReminders, reminderId } from '../lib/notifications/local';
 import { at, mins, MON, TUE } from './fixtures';
 
 const mk = (i: number, start: number, extra: Partial<ReminderBlock> = {}): ReminderBlock => ({
@@ -75,7 +69,11 @@ describe('local reminder scheduler', () => {
   it('diff cancels stale/moved and schedules only new', () => {
     const moved = mk(1, at(MON, '10:00'));
     const desired = desiredReminders([moved, mk(2, at(MON, '11:00'))], { now, offsetMinutes: 10 });
-    const scheduled = [{ id: reminderId({ id: 'b1', start: at(MON, '09:00') }) }, { id: reminderId(mk(2, at(MON, '11:00'))) }, { id: 'legacy' }];
+    const scheduled = [
+      { id: reminderId({ id: 'b1', start: at(MON, '09:00') }) },
+      { id: reminderId(mk(2, at(MON, '11:00'))) },
+      { id: 'legacy' },
+    ];
     const d = diffReminders(scheduled, desired);
     expect(d.cancel.sort()).toEqual([reminderId({ id: 'b1', start: at(MON, '09:00') }), 'legacy'].sort());
     expect(d.schedule.map((s) => s.data.blockId)).toEqual(['b1']);
