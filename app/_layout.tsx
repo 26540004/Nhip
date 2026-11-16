@@ -10,6 +10,7 @@ import { SetupRequired } from '../src/features/auth/SetupRequired';
 import { startSessionListener, useSession } from '../src/features/auth/session';
 import { QuickAddSheet } from '../src/features/quick-add/QuickAddSheet';
 import { useKeyboardShortcuts } from '../src/hooks/useKeyboardShortcuts';
+import { useAutoSync } from '../src/hooks/useSync';
 import { QUERY_CACHE_BUSTER, queryClient, queryPersister } from '../src/lib/api/queryClient';
 import { isSupabaseConfigured } from '../src/lib/api/supabase';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
@@ -78,9 +79,12 @@ export default function RootLayout() {
                   <Stack.Screen name="search" options={{ presentation: 'modal' }} />
                   <Stack.Screen name="settings/index" />
                   <Stack.Screen name="settings/collections" />
+                  <Stack.Screen name="settings/google" />
+                  <Stack.Screen name="plan" options={{ presentation: 'modal' }} />
                 </Stack.Protected>
               </Stack>
               {signedIn && <QuickAddSheet />}
+              {signedIn && <AutoSync />}
               <ToastHost />
             </NavThemeProvider>
           </ThemeProvider>
@@ -88,4 +92,10 @@ export default function RootLayout() {
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
+}
+
+/** Google Calendar sync on app open / foreground (no UI). */
+function AutoSync() {
+  useAutoSync(true);
+  return null;
 }

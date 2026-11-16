@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useResponsive } from '../hooks/useResponsive';
 import { useTheme } from '../theme/ThemeProvider';
@@ -12,11 +12,19 @@ export function Screen({
   right,
   children,
   scroll = true,
+  onRefresh,
+  refreshing = false,
+  footer,
 }: {
   title: string;
   right?: ReactNode;
   children: ReactNode;
   scroll?: boolean;
+  /** Pull-to-refresh. */
+  onRefresh?: () => void;
+  refreshing?: boolean;
+  /** Floating content above the scroll view (e.g. the AI button). */
+  footer?: ReactNode;
 }) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
@@ -32,12 +40,19 @@ export function Screen({
         {right}
       </View>
       {scroll ? (
-        <ScrollView contentContainerStyle={[styles.scroll, mode === 'desktop' && styles.wide]} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          contentContainerStyle={[styles.scroll, mode === 'desktop' && styles.wide]}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.primary} /> : undefined
+          }
+        >
           {body}
         </ScrollView>
       ) : (
         <View style={[styles.flex, mode === 'desktop' && styles.wide]}>{body}</View>
       )}
+      {footer}
     </View>
   );
 }

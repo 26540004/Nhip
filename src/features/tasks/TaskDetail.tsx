@@ -23,6 +23,7 @@ import { errorMessage } from '../../components/QueryState';
 import { TextField } from '../../components/TextField';
 import { showToast } from '../../components/Toast';
 import { useNow } from '../../hooks/useNow';
+import { useStartPlan } from '../plan/useStartPlan';
 import { vi } from '../../i18n/vi';
 import { confirmDestructive } from '../../lib/confirm';
 import { parseTask } from '../../lib/api/functions';
@@ -250,6 +251,7 @@ function ExistingTask({ task, allTasks, onClose }: { task: Task; allTasks: Task[
   const createLinks = useCreateLinks();
   const deleteLink = useDeleteLink(task.id);
   const { open, toggle } = useFieldToggle();
+  const plan = useStartPlan();
 
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
@@ -409,6 +411,15 @@ function ExistingTask({ task, allTasks, onClose }: { task: Task; allTasks: Task[
           </View>
         ) : null}
       </Card>
+
+      {!done && (
+        <Button
+          label={plan.busy ? vi.aiPlan.working : vi.aiPlan.scheduleThis}
+          variant="ai"
+          loading={plan.busy}
+          onPress={() => void plan.start({ task_ids: [task.id] })}
+        />
+      )}
 
       <TextField
         label={vi.tasks.fields.description}

@@ -15,7 +15,7 @@ Ba vấn đề cốt lõi: dồn quá nhiều việc vào một ngày → giới
 |---|---|---|
 | **1. Nền móng** | Expo + Router + TypeScript strict, design tokens, i18n tiếng Việt, điều hướng (tab bar điện thoại / sidebar desktop, phím tắt), toàn bộ schema Supabase + RLS + tìm kiếm + pg_cron, thư viện thuần đã kiểm thử: `slots`, `capacity`, `priority`, `validatePlan`, `greedyPlan`, bộ lập lịch thông báo cục bộ | ✅ Xong |
 | **2. Dữ liệu & Việc** | Đăng nhập Apple/Google, truy vấn có kiểu + hàng đợi ghi offline, Việc (nhóm, lọc, chi tiết, việc con, liên kết), Ghi chú (danh sách, soạn thảo tự lưu, checklist → việc), Hôm nay dùng dữ liệu thật, Tìm kiếm, Môn học & dự án, Quick Add + Edge Function `parse-task` (Gemini → Groq), 34 fixture ngày giờ tiếng Việt | ✅ Xong |
-| 3. Lịch & AI xếp lịch | `gcal-auth`, `gcal-sync`, `propose-plan`, màn hình duyệt đề xuất, Hoàn tác, màn Lịch (Ngày/3 ngày/Tuần), kéo thả | ⏳ |
+| **3. Lịch & AI xếp lịch** | `gcal-auth` (OAuth, Vault, lịch riêng "Nhịp"), `gcal-sync` (2 chiều, syncToken, 410, thu hồi quyền), `propose-plan` (AI đề xuất → code kiểm tra/sửa/bổ sung, dự phòng không AI, Cân bằng lại, Xếp lịch việc này), màn duyệt đề xuất + Hoàn tác 10 s, màn Lịch Ngày/3 ngày/Tuần với kéo thả và "Đổi giờ", cài đặt Google | ✅ Xong |
 | 4. Nhắc nhở | Thông báo cục bộ (≤ 50), `push-dispatch`, bản tóm tắt sáng / tổng kết tối | ⏳ |
 | 5. Ghi âm & Ghi chú giàu nội dung | Trình soạn thảo, ảnh, link preview, ghi âm nền theo đoạn, `transcribe-audio`, tóm tắt | ⏳ |
 | 6. Hoàn thiện | Onboarding, Cài đặt đầy đủ, seed, xuất dữ liệu, QA trên iPhone thật | ⏳ |
@@ -40,6 +40,26 @@ Môn học/dự án được khớp theo tên (không dấu); nếu AI và từ 
 GEMINI_API_KEY=… GEMINI_MODEL=… GROQ_API_KEY=… GROQ_MODEL=… \
   deno run --allow-env --allow-net --config supabase/functions/parse-task/deno.json scripts/eval-parse.ts
 ```
+
+## AI xếp lịch: AI đề xuất, code quyết định
+
+1. `propose-plan` dựng ngữ cảnh trên máy chủ: việc cần xếp (việc con thay cho việc cha; không có ước tính → 60 phút; phút còn lại = ước tính − khối đã có), khung trống tính bằng code từ giờ hành chính, thời khóa biểu + ngoại lệ, khung học, giờ bận Google, giờ yên lặng.
+2. AI chỉ nhận JSON gọn: danh sách việc (bí danh T1, T2…) + khung trống. Chế độ riêng tư: tiêu đề cắt còn 60 ký tự, không gửi ghi chú.
+3. Mọi khối AI trả về đi qua `validatePlan` (cùng engine với app): sai khung → dời tới giờ hợp lệ gần nhất, không dời được → bỏ kèm cảnh báo. Phút còn thiếu được bổ sung tự động. Cảnh báo "Không đủ thời gian…" và số phút quá tải luôn do code tính.
+4. AI lỗi/hết lượt → lịch do Nhịp tự xếp theo quy tắc (có ghi chú rõ trên màn duyệt).
+5. Không gì lên Google trước khi bạn bấm Đồng ý. Khi áp dụng, app kiểm tra lại từng khối với lịch **hiện tại** (lịch có thể đã đổi từ lúc đề xuất). "Hoàn tác" trong 10 giây xóa các sự kiện vừa tạo.
+
+Lõi lập lịch nằm ở `supabase/functions/_shared/planning/` và được **cả app lẫn Edge Function** dùng (app import qua `src/lib/time`, `src/lib/planning`). Múi giờ xử lý bằng `Intl` thay cho date-fns-tz để chạy được trên Deno mà không cần thư viện ngoài.
+
+## Đồng bộ Google Calendar
+
+- **Quyền (scope) hẹp nhất**: `openid`, `email`, `calendar.calendarlist.readonly` (liệt kê lịch để chọn), `calendar.events.readonly` (đọc giờ bận + tiêu đề của lịch bạn chọn), `calendar.app.created` (tạo lịch riêng "Nhịp" và chỉ ghi/sửa/xóa sự kiện trong lịch đó). Nhịp **không thể** sửa các lịch khác của bạn. Vì vậy lịch đích luôn là lịch "Nhịp".
+- Sự kiện do app tạo: tiêu đề = tên việc, mô tả có link `nhip://task/<id>`, màu theo không gian (Học = xanh, Việc = cam), `extendedProperties.private.appTaskId/appBlockId`, id sự kiện cố định theo khối ⇒ chạy lại không tạo trùng. Nhắc nhở của Google tắt (Nhịp tự nhắc).
+- Lịch "Nhịp": đồng bộ tăng dần bằng `syncToken`. Dời sự kiện trên Google → khối trong app đổi giờ; xóa trên Google → khối bị bỏ, việc quay về "Chưa xếp lịch". `410 Gone` → đồng bộ lại toàn bộ.
+- Lịch để đọc giờ bận: làm mới khoảng [hôm qua, +35 ngày] với `singleEvents=true` (Google không cho dùng `syncToken` cùng giới hạn thời gian khi cần bung sự kiện lặp). Sự kiện cả ngày và sự kiện "rảnh" được hiển thị nhưng không chặn giờ.
+- Sửa cùng lúc ở hai nơi: Google thắng, khối được đánh dấu "Xung đột" (viền đỏ) để bạn xem lại.
+- Chạy khi mở app / quay lại app, khi kéo để làm mới, sau khi duyệt/dời/bỏ khối, và mỗi 15 phút bằng pg_cron.
+- Token bị thu hồi → trạng thái "Google đã thu hồi quyền truy cập. Hãy kết nối lại." + nút **Kết nối lại**.
 
 ## Ngoại tuyến
 
@@ -106,7 +126,7 @@ npm test                    # Jest: tz, slots, capacity, priority, validatePlan/
                             #       ngày giờ tiếng Việt, pipeline parse-task (provider giả), nhóm việc, checklist
 npm run typecheck           # tsc --noEmit
 npm run lint                # ESLint (eslint-config-expo)
-npm run check:functions     # deno check Edge Functions (cần Deno)
+npm run check:functions     # deno check tất cả Edge Functions (cần Deno)
 cd scripts/db-check && npm install && npm run check   # migrations + RLS trên Postgres thật
 ```
 
@@ -137,7 +157,13 @@ cd scripts/db-check && npm install && npm run check   # migrations + RLS trên P
 7. Deploy Edge Function và đặt secrets:
    ```bash
    npx supabase secrets set GEMINI_API_KEY=… GEMINI_MODEL=… GROQ_API_KEY=… GROQ_MODEL=… AI_DAILY_CALL_LIMIT=200
+   npx supabase secrets set GOOGLE_OAUTH_CLIENT_ID=… GOOGLE_OAUTH_CLIENT_SECRET=… \
+     GOOGLE_OAUTH_REDIRECT_URI=https://<project-ref>.supabase.co/functions/v1/gcal-auth/callback \
+     WEB_APP_URL=https://<địa-chỉ-web-của-bạn>
    npx supabase functions deploy parse-task
+   npx supabase functions deploy propose-plan
+   npx supabase functions deploy gcal-sync
+   npx supabase functions deploy gcal-auth --no-verify-jwt   # Google redirect không mang JWT; hàm tự kiểm tra
    ```
    Lấy key Gemini miễn phí tại aistudio.google.com, key Groq tại console.groq.com. Đặt `GEMINI_MODEL` là model Flash miễn phí mới nhất đang có trong AI Studio; `GROQ_MODEL` là một model chat hỗ trợ JSON mode.
 
@@ -159,12 +185,12 @@ Bucket lưu trữ `attachments` được tạo ở chế độ **private**; file
 
 ---
 
-## Google Cloud OAuth (chuẩn bị cho giai đoạn 3)
+## Google Cloud OAuth
 
 1. console.cloud.google.com → tạo project "Nhip".
 2. APIs & Services → Library → bật **Google Calendar API**.
 3. OAuth consent screen → User type **External** → điền tên ứng dụng, email hỗ trợ.
-4. Scopes: chọn phạm vi hẹp nhất đủ dùng (đọc sự kiện/free-busy của lịch được chọn; tạo/sửa/xóa sự kiện trong lịch đích). Tên scope chính xác sẽ được kiểm tra lại với tài liệu Google khi triển khai và ghi vào đây.
+4. Data Access → Add scopes: `openid`, `email`, `.../auth/calendar.calendarlist.readonly`, `.../auth/calendar.events.readonly`, `.../auth/calendar.app.created` (đã đối chiếu danh sách scope Calendar API hiện hành của Google; lý do chọn ở mục "Đồng bộ Google Calendar").
 5. Test users: thêm email Google của bạn.
 6. **Publishing status → bấm "Publish app" để chuyển sang "In production".** Ở trạng thái "Testing", refresh token hết hạn sau 7 ngày và bạn sẽ phải kết nối lại mỗi tuần. Với mục đích cá nhân, ứng dụng chưa xác minh ở trạng thái "In production" vẫn dùng được; khi đăng nhập Google sẽ cảnh báo "Google chưa xác minh ứng dụng này" → chọn **Nâng cao → Đi tới Nhip (không an toàn)**.
 7. Credentials → Create OAuth client ID → **Web application**; Authorized redirect URI: `https://<project-ref>.supabase.co/functions/v1/gcal-auth/callback`.

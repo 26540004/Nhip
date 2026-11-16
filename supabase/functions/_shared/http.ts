@@ -13,7 +13,18 @@ export function json(body: unknown, status = 200): Response {
 }
 
 /** Error codes the client maps to Vietnamese messages (src/i18n/vi.ts → errors). */
-export type ErrorCode = 'unauthorized' | 'bad_request' | 'ai_unavailable' | 'ai_quota' | 'privacy_mode' | 'not_found' | 'internal';
+export type ErrorCode =
+  | 'unauthorized'
+  | 'bad_request'
+  | 'ai_unavailable'
+  | 'ai_quota'
+  | 'privacy_mode'
+  | 'not_found'
+  | 'gcal_not_connected'
+  | 'gcal_revoked'
+  | 'gcal_failed'
+  | 'no_tasks'
+  | 'internal';
 
 export function errorResponse(code: ErrorCode, status: number, detail?: string): Response {
   return json({ error: code, ...(detail ? { detail } : {}) }, status);

@@ -61,6 +61,19 @@ export default function SettingsScreen() {
 
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={vi.google.title}
+        onPress={() => router.push('/settings/google')}
+        style={[styles.link, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      >
+        <Ionicons name="logo-google" size={20} color={colors.textBody} />
+        <AppText variant="body" tone="heading" style={styles.flex}>
+          {vi.google.title}
+        </AppText>
+        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      </Pressable>
+
+      <Pressable
+        accessibilityRole="button"
         accessibilityLabel={vi.collections.title}
         onPress={() => router.push('/settings/collections')}
         style={[styles.link, { backgroundColor: colors.surface, borderColor: colors.border }]}

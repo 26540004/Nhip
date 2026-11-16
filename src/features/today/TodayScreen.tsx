@@ -19,6 +19,9 @@ import { Screen } from '../../components/Screen';
 import { SpaceFilterControl } from '../../components/SpaceFilterControl';
 import { TaskRow } from '../../components/TaskRow';
 import { useNow } from '../../hooks/useNow';
+import { useSync } from '../../hooks/useSync';
+import { AiPlanButton } from '../plan/AiPlanButton';
+import { useStartPlan } from '../plan/useStartPlan';
 import { vi } from '../../i18n/vi';
 import { completionPatch, usePendingSyncCount, useUpdateTask } from '../../lib/api/mutations';
 import { useBlocks, useBusy, useCollections, useSettings, useTasks } from '../../lib/api/queries';
@@ -51,6 +54,8 @@ export function TodayScreen() {
   const collections = useCollections().data ?? [];
   const update = useUpdateTask();
   const pending = usePendingSyncCount();
+  const sync = useSync();
+  const plan = useStartPlan();
 
   const tasks = useMemo(() => tasksQ.data ?? [], [tasksQ.data]);
   const taskById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
@@ -117,9 +122,16 @@ export function TodayScreen() {
   return (
     <Screen
       title={formatDayHeader(today)}
+      onRefresh={() => {
+        void sync.syncNow({ force: true });
+        void Promise.all([tasksQ.refetch(), blocksQ.refetch(), busyQ.refetch()]);
+      }}
+      refreshing={tasksQ.isRefetching}
+      footer={<AiPlanButton />}
       right={
         <View style={styles.inline}>
           {pending > 0 && <Chip label={`${vi.states.pendingSync} · ${pending}`} icon="cloud-upload-outline" tone="warning" />}
+          {sync.connected && <SyncDot state={sync.state} />}
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={vi.tabs.settings}
@@ -137,7 +149,7 @@ export function TodayScreen() {
         {loads.length > 0 && (
           <Card>
             {loads.map((l) => (
-              <CapacityBar key={`${l.date}-${l.space}`} load={l} />
+              <CapacityBar key={`${l.date}-${l.space}`} load={l} onRebalance={() => void plan.start({ rebalance_date: today })} />
             ))}
           </Card>
         )}
@@ -170,7 +182,27 @@ export function TodayScreen() {
   );
 }
 
+/** Google sync status: green synced, amber syncing, red error (tap to fix). Icon + label for VoiceOver. */
+function SyncDot({ state }: { state: 'idle' | 'syncing' | 'error' }) {
+  const { colors } = useTheme();
+  const color = state === 'error' ? colors.danger : state === 'syncing' ? colors.warning : colors.success;
+  const label = state === 'error' ? vi.today.sync.error : state === 'syncing' ? vi.today.sync.syncing : vi.today.sync.ok;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={() => router.push('/settings/google')}
+      hitSlop={8}
+      style={styles.dotWrap}
+    >
+      <View style={[styles.dot, { backgroundColor: color }]} />
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
+  dotWrap: { width: touchTarget, height: touchTarget, alignItems: 'center', justifyContent: 'center' },
+  dot: { width: 10, height: 10, borderRadius: 5 },
   section: { gap: spacing.md },
   inline: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   avatar: {

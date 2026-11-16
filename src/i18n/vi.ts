@@ -1,27 +1,12 @@
+import { viCore } from '../../supabase/functions/_shared/planning/strings.ts';
+
 /**
  * All user-visible Vietnamese strings. Nothing user-facing is hardcoded elsewhere.
  * Functions are used where a string needs values.
  */
 export const vi = {
+  ...viCore,
   appName: 'Nhịp',
-
-  weekdays: ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'] as const,
-  weekdaysShort: ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7'] as const,
-
-  duration: {
-    minutes: (m: number) => `${m} phút`,
-    hours: (h: number) => `${h} giờ`,
-    /** Compact form used in capacity bars: 5g20, 6g, 40p. */
-    compact: (h: number, m: number) => (h === 0 ? `${m}p` : m === 0 ? `${h}g` : `${h}g${String(m).padStart(2, '0')}`),
-  },
-
-  countdown: {
-    overdue: (d: number) => (d <= 0 ? 'Quá hạn' : `Quá hạn ${d} ngày`),
-    today: 'Hôm nay',
-    tomorrow: 'Ngày mai',
-    days: (d: number) => `còn ${d} ngày`,
-    hours: (h: number) => `còn ${h} giờ`,
-  },
 
   tabs: {
     today: 'Hôm nay',
@@ -33,52 +18,17 @@ export const vi = {
   },
 
   spaceFilter: { all: 'Tất cả', study: 'Học', work: 'Việc' },
-  space: { study: 'Học tập', work: 'Công việc' },
-
   priority: {
     1: 'Cao',
     2: 'Vừa',
     3: 'Thấp',
   } as Record<1 | 2 | 3, string>,
 
-  priorityReason: {
-    overdue: 'Đã quá hạn',
-    dueToday: 'Hạn hôm nay',
-    dueTomorrow: 'Hạn ngày mai',
-    dueSoon: (d: number) => `Hạn trong ${d} ngày`,
-    tightTime: (h: string) => `Còn ${h} cần làm, thời gian sát`,
-    highPriority: 'Ưu tiên cao',
-    noDeadline: 'Không có hạn',
-    join: ' · ',
-  },
-
   capacity: {
     label: (space: string, used: string, max: string) => `${space} ${used} / ${max}`,
     over: (amount: string) => `Quá tải ${amount}`,
     near: 'Gần đầy',
     rebalance: 'Cân bằng lại',
-  },
-
-  plan: {
-    issue: {
-      unknown_task: 'Khối gắn với việc không tồn tại',
-      invalid_range: 'Giờ bắt đầu/kết thúc không hợp lệ',
-      too_long: 'Khối dài hơn 90 phút',
-      too_short: 'Khối quá ngắn',
-      outside_window: 'Nằm ngoài khung giờ cho phép',
-      overlap: 'Trùng lịch bận, lớp học hoặc khối khác',
-      after_deadline: 'Kết thúc sau hạn chót',
-      exceeds_remaining: 'Vượt quá thời lượng còn lại của việc',
-      over_capacity: 'Vượt sức chứa của ngày',
-      too_many_consecutive: 'Quá 3 giờ tập trung liên tục',
-    },
-    warning: {
-      cannotFit: (title: string, shortfall: string) => `Không đủ thời gian cho '${title}' trước hạn — cần thêm ${shortfall}`,
-      partial: (title: string, left: string) => `'${title}' còn ${left} chưa xếp được`,
-      overload: (day: string, space: string, amount: string) => `${day}: ${space} quá tải ${amount}`,
-      dropped: (title: string) => `Đã bỏ một khối của '${title}' vì không tìm được giờ hợp lệ`,
-      repaired: (title: string) => `Đã dời một khối của '${title}' sang giờ hợp lệ gần nhất`,
-    },
   },
 
   notifications: {
@@ -108,6 +58,87 @@ export const vi = {
 
   aiMarker: '✦ AI',
 
+  aiPlan: {
+    button: '✦ AI xếp lịch',
+    chooseRange: 'Xếp lịch cho',
+    ranges: { today: 'Hôm nay', tomorrow: 'Ngày mai', week: '7 ngày tới' } as Record<'today' | 'tomorrow' | 'week', string>,
+    working: 'AI đang xếp lịch…',
+    noTasks: 'Không có việc nào cần xếp lịch trong khoảng này.',
+    scheduleThis: '✦ Xếp lịch việc này',
+  },
+
+  review: {
+    title: 'AI đề xuất',
+    warnings: 'Cảnh báo',
+    why: 'Vì sao',
+    accept: 'Đồng ý',
+    edit: 'Sửa giờ',
+    reject: 'Bỏ',
+    acceptAll: 'Đồng ý tất cả',
+    applyGoogle: (n: number) => `Thêm ${n} khối vào Google Calendar`,
+    applyLocal: (n: number) => `Lưu ${n} khối vào lịch`,
+    applied: (n: number) => `Đã thêm ${n} khối`,
+    undo: 'Hoàn tác',
+    undone: 'Đã hoàn tác',
+    nothingSelected: 'Chọn ít nhất một khối để thêm.',
+    pickTime: 'Chọn giờ hợp lệ',
+    noValidSlots: 'Không còn giờ trống hợp lệ trong ngày này.',
+    otherDay: 'Ngày khác',
+    alreadyApplied: 'Đề xuất này đã được áp dụng.',
+    replaces: (n: number) => `Thay cho ${n} khối cũ của ngày quá tải`,
+    accepted: 'Đã đồng ý',
+    rejected: 'Đã bỏ',
+    duration: (m: string) => `${m}`,
+    empty: 'AI không tìm được khối nào phù hợp.',
+    stale: (title: string, why: string) => `'${title}' không còn hợp lệ (${why}). Hãy chọn giờ khác hoặc bỏ khối này.`,
+  },
+
+  calendar: {
+    views: { day: 'Ngày', three: '3 ngày', week: 'Tuần' } as Record<'day' | 'three' | 'week', string>,
+    today: 'Hôm nay',
+    prev: 'Trước',
+    next: 'Sau',
+    moveInvalid: 'Không thể dời tới đây',
+    moved: 'Đã dời khối',
+    afterDeadline: 'Lưu ý: khối này kết thúc sau hạn chót.',
+    dragHint: 'Nhấn giữ rồi kéo để dời khối',
+    proposed: 'Đề xuất',
+    month: (m: number, y: number) => `Tháng ${m}, ${y}`,
+  },
+
+  block: {
+    openTask: 'Mở việc',
+    changeTime: 'Đổi giờ',
+    markDone: 'Đánh dấu xong',
+    drop: 'Bỏ khối này',
+    dropped: 'Đã bỏ khối — việc quay lại "Chưa xếp lịch"',
+    conflict: 'Giờ đã bị đổi trong Google Calendar',
+  },
+
+  google: {
+    title: 'Google Calendar',
+    connect: 'Kết nối Google Calendar',
+    reconnect: 'Kết nối lại',
+    disconnect: 'Ngắt kết nối',
+    confirmDisconnect: 'Ngắt kết nối Google Calendar? Các khối vẫn giữ trong Nhịp nhưng không còn đồng bộ.',
+    connectedAs: (email: string) => `Đã kết nối: ${email}`,
+    why: 'Nhịp đọc lịch bạn chọn để biết giờ bận, và chỉ ghi các khối việc vào một lịch riêng tên "Nhịp". Nhịp không sửa được các lịch khác của bạn.',
+    unverified: 'Google có thể báo "Ứng dụng chưa được xác minh" — chọn Nâng cao → Đi tới Nhịp để tiếp tục (ứng dụng cá nhân của bạn).',
+    readCalendars: 'Lịch dùng để biết giờ bận',
+    target: 'Lịch ghi khối việc',
+    targetName: 'Nhịp (lịch riêng của app)',
+    lastSync: (t: string) => `Đồng bộ lần cuối: ${t}`,
+    never: 'Chưa đồng bộ',
+    syncNow: 'Đồng bộ ngay',
+    syncing: 'Đang đồng bộ…',
+    connected: 'Đã kết nối Google Calendar',
+    cancelled: 'Đã hủy kết nối',
+    failed: 'Kết nối Google thất bại. Thử lại nhé.',
+    notConnected: 'Chưa kết nối Google Calendar — các khối chỉ lưu trong Nhịp.',
+    revoked: 'Google đã thu hồi quyền truy cập. Hãy kết nối lại.',
+    syncError: 'Đồng bộ thất bại — chạm để xem',
+  },
+
   common: {
     close: 'Đóng',
     notFound: 'Không tìm thấy trang này',
@@ -130,6 +161,10 @@ export const vi = {
     offline: 'Cần kết nối mạng',
     network: 'Không kết nối được máy chủ. Thử lại nhé.',
     unauthorized: 'Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.',
+    no_tasks: 'Không có việc nào cần xếp lịch trong khoảng này.',
+    gcal_revoked: 'Google đã thu hồi quyền truy cập. Hãy kết nối lại.',
+    gcal_failed: 'Đồng bộ Google Calendar thất bại.',
+    gcal_not_connected: 'Chưa kết nối Google Calendar.',
     ai_unavailable: 'AI tạm thời không phản hồi.',
     ai_quota: 'Đã hết lượt AI hôm nay.',
     privacy_mode: 'Đang bật chế độ riêng tư — tính năng này tắt.',
@@ -258,7 +293,7 @@ export const vi = {
     aiUsage: (n: number) => `Lượt AI hôm nay: ${n}`,
     privacy: 'Không gửi nội dung ghi chú cho AI',
     privacyHelp: 'Khi bật, AI chỉ nhận tiêu đề, thời lượng, hạn chót và giờ. Chuyển giọng nói thành chữ và tóm tắt ghi chú sẽ tắt.',
-    moreLater: 'Google Calendar, giờ hành chính, thời khóa biểu và nhắc nhở có ở các giai đoạn tiếp theo.',
+    moreLater: 'Giờ hành chính, thời khóa biểu, sức chứa và nhắc nhở có ở các giai đoạn tiếp theo.',
   },
 
   comingSoon: {

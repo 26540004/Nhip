@@ -32,6 +32,9 @@ export const qk = {
   profile: ['profile'] as const,
   taskBlocks: (taskId: string) => ['taskBlocks', taskId] as const,
   links: (ownerId: string) => ['links', ownerId] as const,
+  google: ['google'] as const,
+  proposal: (id: string) => ['proposal', id] as const,
+  proposedBlocks: (from: string, to: string) => ['proposedBlocks', from, to] as const,
 };
 
 const TASK_COLUMNS =
@@ -224,5 +227,85 @@ export function useLinks(ownerId: string | undefined) {
           .eq('type', 'link')
           .order('created_at'),
       ) as Attachment[],
+  });
+}
+
+export interface GoogleConnection {
+  google_email: string | null;
+  read_calendar_ids: string[];
+  target_calendar_id: string | null;
+  status: 'disconnected' | 'connected' | 'syncing' | 'error' | 'revoked';
+  last_error: string | null;
+  last_synced_at: string | null;
+}
+
+export function useGoogleConnection() {
+  return useQuery({
+    queryKey: qk.google,
+    queryFn: async () =>
+      unwrap(
+        await requireSupabase()
+          .from('google_connections')
+          .select('google_email, read_calendar_ids, target_calendar_id, status, last_error, last_synced_at')
+          .maybeSingle(),
+      ) as GoogleConnection | null,
+  });
+}
+
+export interface Proposal {
+  id: string;
+  range_start: string;
+  range_end: string;
+  status: 'pending' | 'reviewed' | 'applied';
+  request_context_json: { replaces_block_ids?: string[]; privacy_mode?: boolean };
+  validation_report_json: {
+    source: 'ai' | 'fallback';
+    summary: string;
+    notice: string | null;
+    warnings: { kind: string; taskId?: string; message: string }[];
+  } | null;
+  created_at: string;
+}
+
+export function useProposal(id: string | undefined) {
+  return useQuery({
+    queryKey: qk.proposal(id ?? ''),
+    enabled: Boolean(id),
+    queryFn: async () => {
+      const db = requireSupabase();
+      const [p, b] = await Promise.all([
+        db
+          .from('ai_proposals')
+          .select('id, range_start, range_end, status, request_context_json, validation_report_json, created_at')
+          .eq('id', id!)
+          .maybeSingle(),
+        db
+          .from('task_blocks')
+          .select('id, user_id, task_id, start_at, end_at, status, proposal_id, reason, gcal_event_id, last_synced_at')
+          .eq('proposal_id', id!)
+          .order('start_at'),
+      ]);
+      return { proposal: unwrap(p) as Proposal | null, blocks: unwrap(b) as TaskBlock[] };
+    },
+  });
+}
+
+/** Proposed (not yet reviewed) blocks in a range — shown dashed on the calendar. */
+export function useProposedBlocks(from: string, to: string) {
+  return useQuery({
+    queryKey: qk.proposedBlocks(from, to),
+    queryFn: async () =>
+      unwrap(
+        await requireSupabase()
+          .from('task_blocks')
+          .select(
+            'id, user_id, task_id, start_at, end_at, status, proposal_id, reason, gcal_event_id, last_synced_at, ai_proposals!inner(status)',
+          )
+          .eq('status', 'proposed')
+          .eq('ai_proposals.status', 'pending')
+          .lt('start_at', to)
+          .gt('end_at', from)
+          .order('start_at'),
+      ) as TaskBlock[],
   });
 }
