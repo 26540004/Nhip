@@ -3,7 +3,7 @@
  * wide screens. `taskId === 'new'` renders the create form.
  * Existing tasks save field-by-field (optimistic, offline-queued).
  */
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as WebBrowser from 'expo-web-browser';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';

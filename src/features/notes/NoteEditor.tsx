@@ -3,7 +3,7 @@
  * and shows "Đã lưu". Checklist lines can be turned into tasks linked to the note.
  * Rich formatting, images and audio arrive with the cross-platform editor in Phase 5.
  */
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { AppText } from '../../components/AppText';

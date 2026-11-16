@@ -4,11 +4,12 @@
  * now line) and "Chưa xếp lịch" (today's and overdue tasks without a block).
  * The "✦ AI xếp lịch" button and "Cân bằng lại" arrive with propose-plan in Phase 3.
  */
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { AppText } from '../../components/AppText';
+import { Button } from '../../components/Button';
 import { CapacityBar } from '../../components/CapacityBar';
 import { Card } from '../../components/Card';
 import { Chip } from '../../components/Chip';
@@ -25,6 +26,7 @@ import { useStartPlan } from '../plan/useStartPlan';
 import { vi } from '../../i18n/vi';
 import { completionPatch, usePendingSyncCount, useUpdateTask } from '../../lib/api/mutations';
 import { useBlocks, useBusy, useCollections, useSettings, useTasks } from '../../lib/api/queries';
+import { isDemo } from '../../lib/api/supabase';
 import type { Task, TaskBlock } from '../../lib/api/types';
 import { computeLoads } from '../../lib/planning/capacity';
 import { rulesFromSettings } from '../../lib/settings/rules';
@@ -40,6 +42,8 @@ export function TodayScreen() {
   const { colors } = useTheme();
   const now = useNow();
   const filter = useUiStore((s) => s.spaceFilter.today);
+  const demoDismissed = useUiStore((s) => s.demoBannerDismissed);
+  const dismissDemo = useUiStore((s) => s.dismissDemoBanner);
   const settings = useSettings();
   const rules = useMemo(() => rulesFromSettings(settings.data), [settings.data]);
   const today = dateKeyOf(now, rules.tz);
@@ -143,6 +147,15 @@ export function TodayScreen() {
         </View>
       }
     >
+      {isDemo && !demoDismissed && (
+        <Card ai>
+          <AppText variant="meta" tone="primary">
+            {vi.demo.tag}
+          </AppText>
+          <AppText variant="secondary">{vi.demo.banner}</AppText>
+          <Button label={vi.demo.gotIt} variant="secondary" onPress={dismissDemo} />
+        </Card>
+      )}
       <SpaceFilterControl screen="today" />
 
       <QueryState isLoading={tasksQ.isLoading} error={tasksQ.error} hasData={tasksQ.data != null} onRetry={() => void tasksQ.refetch()}>

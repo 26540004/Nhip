@@ -9,6 +9,8 @@ interface UiState {
   /** Last space filter per screen (spec §F: remembered per screen). */
   spaceFilter: Record<FilterScreen, SpaceFilter>;
   setSpaceFilter: (screen: FilterScreen, value: SpaceFilter) => void;
+  demoBannerDismissed: boolean;
+  dismissDemoBanner: () => void;
   quickAddOpen: boolean;
   setQuickAddOpen: (open: boolean) => void;
 }
@@ -18,13 +20,15 @@ export const useUiStore = create<UiState>()(
     (set) => ({
       spaceFilter: { today: 'all', tasks: 'all', notes: 'all', calendar: 'all' },
       setSpaceFilter: (screen, value) => set((s) => ({ spaceFilter: { ...s.spaceFilter, [screen]: value } })),
+      demoBannerDismissed: false,
+      dismissDemoBanner: () => set({ demoBannerDismissed: true }),
       quickAddOpen: false,
       setQuickAddOpen: (open) => set({ quickAddOpen: open }),
     }),
     {
       name: 'nhip-ui-v1',
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: (s) => ({ spaceFilter: s.spaceFilter }),
+      partialize: (s) => ({ spaceFilter: s.spaceFilter, demoBannerDismissed: s.demoBannerDismissed }),
     },
   ),
 );

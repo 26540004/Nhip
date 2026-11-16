@@ -1,10 +1,16 @@
-import { Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold, useFonts } from '@expo-google-fonts/inter';
+// Import only the weights we use (the package index pulls in all 18 font files).
+import { Inter_400Regular } from '@expo-google-fonts/inter/400Regular';
+import { Inter_500Medium } from '@expo-google-fonts/inter/500Medium';
+import { Inter_600SemiBold } from '@expo-google-fonts/inter/600SemiBold';
+import { Inter_700Bold } from '@expo-google-fonts/inter/700Bold';
+import { useFonts } from 'expo-font';
 import { PersistQueryClientProvider } from '@tanstack/react-query-persist-client';
 import { DarkTheme, SplashScreen, Stack, ThemeProvider as NavThemeProvider } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { ConfirmHost } from '../src/components/ConfirmHost';
 import { ToastHost } from '../src/components/Toast';
 import { SetupRequired } from '../src/features/auth/SetupRequired';
 import { startSessionListener, useSession } from '../src/features/auth/session';
@@ -85,6 +91,7 @@ export default function RootLayout() {
               </Stack>
               {signedIn && <QuickAddSheet />}
               {signedIn && <AutoSync />}
+              <ConfirmHost />
               <ToastHost />
             </NavThemeProvider>
           </ThemeProvider>

@@ -42,7 +42,8 @@ const config: ExpoConfig = {
     favicon: './assets/favicon.png',
   },
   plugins: [
-    'expo-router',
+    // The browser demo is hosted under an arbitrary path: ship one bundle (no lazy route chunks).
+    ['expo-router', process.env.EXPO_PUBLIC_DEMO === '1' ? { asyncRoutes: { web: false } } : {}],
     'expo-font',
     [
       'expo-splash-screen',

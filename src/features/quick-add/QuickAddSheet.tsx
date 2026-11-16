@@ -5,7 +5,7 @@
  * When AI is unavailable / offline / over quota, the sentence can be saved as-is to the
  * inbox with the "Chưa phân tích" tag and re-parsed later.
  */
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';

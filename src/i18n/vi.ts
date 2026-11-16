@@ -139,6 +139,16 @@ export const vi = {
     syncError: 'Đồng bộ thất bại — chạm để xem',
   },
 
+  demo: {
+    banner:
+      'Bản demo — dữ liệu mẫu, chỉ lưu trong trình duyệt này. Thêm nhanh và xếp lịch chạy bằng quy tắc (không gọi AI), Google Calendar không kết nối.',
+    gotIt: 'Đã hiểu',
+    planNotice: 'Bản demo: lịch do Nhịp tự xếp theo quy tắc, không gọi AI.',
+    reset: 'Đặt lại dữ liệu demo',
+    resetDone: 'Đã đặt lại dữ liệu demo',
+    tag: 'DEMO',
+  },
+
   common: {
     close: 'Đóng',
     notFound: 'Không tìm thấy trang này',
@@ -165,6 +175,7 @@ export const vi = {
     gcal_revoked: 'Google đã thu hồi quyền truy cập. Hãy kết nối lại.',
     gcal_failed: 'Đồng bộ Google Calendar thất bại.',
     gcal_not_connected: 'Chưa kết nối Google Calendar.',
+    demo_unavailable: 'Tính năng này không có trong bản demo.',
     ai_unavailable: 'AI tạm thời không phản hồi.',
     ai_quota: 'Đã hết lượt AI hôm nay.',
     privacy_mode: 'Đang bật chế độ riêng tư — tính năng này tắt.',

@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { Pressable, StyleSheet, Switch, View } from 'react-native';
 import { AppText } from '../../src/components/AppText';
@@ -10,6 +10,9 @@ import { signOut, useSession } from '../../src/features/auth/session';
 import { vi } from '../../src/i18n/vi';
 import { useUpdateProfile } from '../../src/lib/api/mutations';
 import { useSettings } from '../../src/lib/api/queries';
+import { queryClient } from '../../src/lib/api/queryClient';
+import { isDemo } from '../../src/lib/api/supabase';
+import { showToast } from '../../src/components/Toast';
 import { useNow } from '../../src/hooks/useNow';
 import { dateKeyOf } from '../../src/lib/time/tz';
 import { useTheme } from '../../src/theme/ThemeProvider';
@@ -89,7 +92,20 @@ export default function SettingsScreen() {
         {vi.settings.moreLater}
       </AppText>
 
-      <Button label={vi.auth.signOut} variant="secondary" onPress={() => void signOut()} />
+      {isDemo ? (
+        <Button
+          label={vi.demo.reset}
+          variant="secondary"
+          onPress={() =>
+            void signOut().then(() => {
+              void queryClient.invalidateQueries();
+              showToast(vi.demo.resetDone);
+            })
+          }
+        />
+      ) : (
+        <Button label={vi.auth.signOut} variant="secondary" onPress={() => void signOut()} />
+      )}
     </Screen>
   );
 }

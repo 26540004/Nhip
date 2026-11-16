@@ -3,7 +3,7 @@
  * Filters: space (shared segmented control), collection, priority; sort by deadline or priority.
  * ≥ 768 px: list + detail side by side.
  */
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';

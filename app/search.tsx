@@ -1,5 +1,5 @@
 /** Search across tasks, notes and transcripts (Postgres FTS, accent-insensitive). */
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';

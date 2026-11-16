@@ -4,7 +4,7 @@
  * ✓ Đồng ý · ✎ Sửa giờ (only valid slots) · ✕ Bỏ, sticky "Thêm N khối vào Google Calendar",
  * secondary "Đồng ý tất cả". After applying: toast with "Hoàn tác" for 10 s.
  */
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQueryClient } from '@tanstack/react-query';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';

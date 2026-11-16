@@ -1,14 +1,6 @@
-import { router } from 'expo-router';
-import { Button } from '../src/components/Button';
-import { EmptyState } from '../src/components/EmptyState';
-import { Screen } from '../src/components/Screen';
-import { vi } from '../src/i18n/vi';
+import { Redirect } from 'expo-router';
 
+/** Unknown paths (old links, the page opened at /index.html, …) go to Today. */
 export default function NotFound() {
-  return (
-    <Screen title={vi.appName}>
-      <EmptyState icon="help-circle-outline" title={vi.common.notFound} />
-      <Button label={vi.tabs.today} onPress={() => router.replace('/')} />
-    </Screen>
-  );
+  return <Redirect href="/" />;
 }

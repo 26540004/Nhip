@@ -2,7 +2,7 @@
  * Notes — "Ghi chú". Pinned first; card shows title, first lines, space chip, collection and
  * attachment icons. ≥ 768 px: list + editor side by side.
  */
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { FlashList } from '@shopify/flash-list';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';

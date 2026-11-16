@@ -1,5 +1,5 @@
 /** "Môn học & dự án": create, rename, archive subjects (Học) and projects (Việc). */
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';

@@ -5,7 +5,7 @@
  * move is validated with the shared planning engine and pushed to Google. "Đổi giờ" in the
  * block sheet is the accessible alternative.
  */
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';

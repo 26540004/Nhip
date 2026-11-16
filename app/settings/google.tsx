@@ -3,7 +3,7 @@
  * target calendar (the app's own "Nhịp" calendar), last sync, "Đồng bộ ngay".
  * Handles the OAuth return (?gcal=connected|cancelled|error).
  */
-import { Ionicons } from '@expo/vector-icons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as Linking from 'expo-linking';
 import { router, useLocalSearchParams } from 'expo-router';
