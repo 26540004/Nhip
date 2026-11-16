@@ -116,6 +116,8 @@ export interface SettingsBundle {
   reminders: {
     morning_brief_time: string;
     evening_review_time: string;
+    morning_brief_enabled: boolean;
+    evening_review_enabled: boolean;
     deadline_offsets_minutes: number[];
     start_offset_minutes: number;
     quiet_start: string | null;
@@ -137,7 +139,9 @@ export async function fetchSettings(): Promise<SettingsBundle> {
     db.from('capacity_settings').select('space, weekday, max_focus_minutes'),
     db
       .from('reminder_settings')
-      .select('morning_brief_time, evening_review_time, deadline_offsets_minutes, start_offset_minutes, quiet_start, quiet_end')
+      .select(
+        'morning_brief_time, evening_review_time, morning_brief_enabled, evening_review_enabled, deadline_offsets_minutes, start_offset_minutes, quiet_start, quiet_end',
+      )
       .maybeSingle(),
   ]);
   return {

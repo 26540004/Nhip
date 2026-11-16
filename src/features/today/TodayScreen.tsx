@@ -21,6 +21,7 @@ import { SpaceFilterControl } from '../../components/SpaceFilterControl';
 import { TaskRow } from '../../components/TaskRow';
 import { useNow } from '../../hooks/useNow';
 import { useSync } from '../../hooks/useSync';
+import { MorningBriefCard, NotificationPromptCard } from '../brief/TodayCards';
 import { AiPlanButton } from '../plan/AiPlanButton';
 import { useStartPlan } from '../plan/useStartPlan';
 import { vi } from '../../i18n/vi';
@@ -156,6 +157,8 @@ export function TodayScreen() {
           <Button label={vi.demo.gotIt} variant="secondary" onPress={dismissDemo} />
         </Card>
       )}
+      <NotificationPromptCard />
+      <MorningBriefCard />
       <SpaceFilterControl screen="today" />
 
       <QueryState isLoading={tasksQ.isLoading} error={tasksQ.error} hasData={tasksQ.data != null} onRetry={() => void tasksQ.refetch()}>

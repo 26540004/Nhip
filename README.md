@@ -16,7 +16,7 @@ Ba vấn đề cốt lõi: dồn quá nhiều việc vào một ngày → giới
 | **1. Nền móng** | Expo + Router + TypeScript strict, design tokens, i18n tiếng Việt, điều hướng (tab bar điện thoại / sidebar desktop, phím tắt), toàn bộ schema Supabase + RLS + tìm kiếm + pg_cron, thư viện thuần đã kiểm thử: `slots`, `capacity`, `priority`, `validatePlan`, `greedyPlan`, bộ lập lịch thông báo cục bộ | ✅ Xong |
 | **2. Dữ liệu & Việc** | Đăng nhập Apple/Google, truy vấn có kiểu + hàng đợi ghi offline, Việc (nhóm, lọc, chi tiết, việc con, liên kết), Ghi chú (danh sách, soạn thảo tự lưu, checklist → việc), Hôm nay dùng dữ liệu thật, Tìm kiếm, Môn học & dự án, Quick Add + Edge Function `parse-task` (Gemini → Groq), 34 fixture ngày giờ tiếng Việt | ✅ Xong |
 | **3. Lịch & AI xếp lịch** | `gcal-auth` (OAuth, Vault, lịch riêng "Nhịp"), `gcal-sync` (2 chiều, syncToken, 410, thu hồi quyền), `propose-plan` (AI đề xuất → code kiểm tra/sửa/bổ sung, dự phòng không AI, Cân bằng lại, Xếp lịch việc này), màn duyệt đề xuất + Hoàn tác 10 s, màn Lịch Ngày/3 ngày/Tuần với kéo thả và "Đổi giờ", cài đặt Google | ✅ Xong |
-| 4. Nhắc nhở | Thông báo cục bộ (≤ 50), `push-dispatch`, bản tóm tắt sáng / tổng kết tối | ⏳ |
+| **4. Nhắc nhở** | Nhắc trước giờ bắt đầu khối (thông báo cục bộ, tối đa 50, nút "Bắt đầu" / "Hoãn 15 phút"), đăng ký push token, `push-dispatch` (tóm tắt sáng, tổng kết tối, nhắc hạn chót, giờ yên lặng, chống gửi trùng), màn `/brief`, `/review`, thẻ tóm tắt trên Hôm nay, Cài đặt → Nhắc nhở | ✅ Xong |
 | 5. Ghi âm & Ghi chú giàu nội dung | Trình soạn thảo, ảnh, link preview, ghi âm nền theo đoạn, `transcribe-audio`, tóm tắt | ⏳ |
 | 6. Hoàn thiện | Onboarding, Cài đặt đầy đủ, seed, xuất dữ liệu, QA trên iPhone thật | ⏳ |
 
@@ -60,6 +60,22 @@ Lõi lập lịch nằm ở `supabase/functions/_shared/planning/` và được 
 - Sửa cùng lúc ở hai nơi: Google thắng, khối được đánh dấu "Xung đột" (viền đỏ) để bạn xem lại.
 - Chạy khi mở app / quay lại app, khi kéo để làm mới, sau khi duyệt/dời/bỏ khối, và mỗi 15 phút bằng pg_cron.
 - Token bị thu hồi → trạng thái "Google đã thu hồi quyền truy cập. Hãy kết nối lại." + nút **Kết nối lại**.
+
+## Nhắc nhở
+
+- **Trên máy (local)**: chỉ nhắc "sắp bắt đầu" cho các khối đã duyệt, mặc định trước 10 phút. iOS cho tối đa 64 thông báo chờ, nên app chỉ giữ **50 khối gần nhất** và lập lại lịch nhắc khi mở app, sau đồng bộ và khi khối thay đổi. Nếu giờ nhắc rơi vào giờ yên lặng, nhắc được dời tới lúc hết giờ yên lặng. Nút "Bắt đầu" chuyển việc sang "đang làm" và mở việc. "Hoãn 15 phút" nhắc lại sau 15 phút.
+- **Từ máy chủ (push)**: `push-dispatch` chạy 5 phút/lần (pg_cron) và gửi qua Expo Push:
+  - tóm tắt buổi sáng (mặc định 07:00) → mở `/brief`;
+  - tổng kết buổi tối (21:30) → mở `/review`;
+  - nhắc hạn chót ở mỗi mốc (mặc định 7 ngày và 1 ngày trước), ví dụ "Còn 1 ngày: Báo cáo môn Mạng (ước tính 3 giờ, mới xếp được 2 giờ)".
+- Chống gửi trùng: mỗi thông báo được "giữ chỗ" trong `notification_log` (khóa duy nhất theo người dùng) **trước** khi gửi; gửi lỗi thì nhả chỗ để lần chạy sau thử lại.
+- Nội dung tóm tắt/tổng kết do code tính (`_shared/brief-core.ts`), giống hệt nội dung màn `/brief` và `/review` trong app.
+- Cần `EAS_PROJECT_ID` để lấy push token. Tùy chọn: `EXPO_ACCESS_TOKEN` (secret của Edge Function) nếu bật bảo mật push trên Expo.
+- Deploy: `npx supabase functions deploy push-dispatch` (cron gọi bằng service key; hàm từ chối mọi lời gọi khác).
+
+## Bản demo trên trình duyệt
+
+`npm run build:demo` tạo `dist-demo/`: app chạy hoàn toàn trong trình duyệt với dữ liệu mẫu (`src/lib/api/demo/`): một client giả lập Supabase trong bộ nhớ, Thêm nhanh bằng quy tắc thay cho AI, xếp lịch bằng lõi lập lịch thật nhưng không gọi AI. Không cần Supabase, khóa AI hay Google. Dữ liệu lưu trong `localStorage` nếu có. Đường dẫn tài nguyên là tương đối nên có thể đặt ở bất kỳ thư mục nào.
 
 ## Ngoại tuyến
 
@@ -164,6 +180,7 @@ cd scripts/db-check && npm install && npm run check   # migrations + RLS trên P
    npx supabase functions deploy propose-plan
    npx supabase functions deploy gcal-sync
    npx supabase functions deploy gcal-auth --no-verify-jwt   # Google redirect không mang JWT; hàm tự kiểm tra
+   npx supabase functions deploy push-dispatch
    ```
    Lấy key Gemini miễn phí tại aistudio.google.com, key Groq tại console.groq.com. Đặt `GEMINI_MODEL` là model Flash miễn phí mới nhất đang có trong AI Studio; `GROQ_MODEL` là một model chat hỗ trợ JSON mode.
 
@@ -180,6 +197,9 @@ Bucket lưu trữ `attachments` được tạo ở chế độ **private**; file
 | `GROQ_API_KEY`, `GROQ_MODEL` | `supabase secrets set` | dự phòng cho tác vụ văn bản |
 | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` | `supabase secrets set` | giai đoạn 3 |
 | `AI_DAILY_CALL_LIMIT` | `supabase secrets set` | mặc định 200 |
+| `WEB_APP_URL` | `supabase secrets set` | địa chỉ web của app (link trong sự kiện Google, cho phép quay lại sau OAuth) |
+| `EXPO_ACCESS_TOKEN` | `supabase secrets set` | tùy chọn, khi bật "enhanced push security" trên Expo |
+| `EXPO_PUBLIC_DEMO` | build | `1` = bản demo trong trình duyệt (dùng qua `npm run build:demo`) |
 
 **Không bao giờ** đặt khóa API của AI hay Google vào biến `EXPO_PUBLIC_*`.
 

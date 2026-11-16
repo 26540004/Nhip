@@ -272,6 +272,8 @@ export function seedDemo(now: number = Date.now()): Tables {
         user_id: DEMO_UID,
         morning_brief_time: '07:00:00',
         evening_review_time: '21:30:00',
+        morning_brief_enabled: true,
+        evening_review_enabled: true,
         deadline_offsets_minutes: [10080, 1440],
         start_offset_minutes: 10,
         quiet_start: '23:00:00',

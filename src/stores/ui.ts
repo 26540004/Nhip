@@ -10,6 +10,10 @@ interface UiState {
   spaceFilter: Record<FilterScreen, SpaceFilter>;
   setSpaceFilter: (screen: FilterScreen, value: SpaceFilter) => void;
   demoBannerDismissed: boolean;
+  briefDismissedDate: string | null;
+  dismissBrief: (date: string) => void;
+  notifPromptDismissed: boolean;
+  dismissNotifPrompt: () => void;
   dismissDemoBanner: () => void;
   quickAddOpen: boolean;
   setQuickAddOpen: (open: boolean) => void;
@@ -21,6 +25,10 @@ export const useUiStore = create<UiState>()(
       spaceFilter: { today: 'all', tasks: 'all', notes: 'all', calendar: 'all' },
       setSpaceFilter: (screen, value) => set((s) => ({ spaceFilter: { ...s.spaceFilter, [screen]: value } })),
       demoBannerDismissed: false,
+      briefDismissedDate: null,
+      dismissBrief: (date) => set({ briefDismissedDate: date }),
+      notifPromptDismissed: false,
+      dismissNotifPrompt: () => set({ notifPromptDismissed: true }),
       dismissDemoBanner: () => set({ demoBannerDismissed: true }),
       quickAddOpen: false,
       setQuickAddOpen: (open) => set({ quickAddOpen: open }),
@@ -28,7 +36,12 @@ export const useUiStore = create<UiState>()(
     {
       name: 'nhip-ui-v1',
       storage: createJSONStorage(() => AsyncStorage),
-      partialize: (s) => ({ spaceFilter: s.spaceFilter, demoBannerDismissed: s.demoBannerDismissed }),
+      partialize: (s) => ({
+        spaceFilter: s.spaceFilter,
+        demoBannerDismissed: s.demoBannerDismissed,
+        briefDismissedDate: s.briefDismissedDate,
+        notifPromptDismissed: s.notifPromptDismissed,
+      }),
     },
   ),
 );

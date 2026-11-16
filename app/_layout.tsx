@@ -16,6 +16,7 @@ import { SetupRequired } from '../src/features/auth/SetupRequired';
 import { startSessionListener, useSession } from '../src/features/auth/session';
 import { QuickAddSheet } from '../src/features/quick-add/QuickAddSheet';
 import { useKeyboardShortcuts } from '../src/hooks/useKeyboardShortcuts';
+import { useNotifications } from '../src/hooks/useNotifications';
 import { useAutoSync } from '../src/hooks/useSync';
 import { QUERY_CACHE_BUSTER, queryClient, queryPersister } from '../src/lib/api/queryClient';
 import { isSupabaseConfigured } from '../src/lib/api/supabase';
@@ -87,6 +88,9 @@ export default function RootLayout() {
                   <Stack.Screen name="settings/collections" />
                   <Stack.Screen name="settings/google" />
                   <Stack.Screen name="plan" options={{ presentation: 'modal' }} />
+                  <Stack.Screen name="brief" />
+                  <Stack.Screen name="review" />
+                  <Stack.Screen name="settings/reminders" />
                 </Stack.Protected>
               </Stack>
               {signedIn && <QuickAddSheet />}
@@ -101,8 +105,9 @@ export default function RootLayout() {
   );
 }
 
-/** Google Calendar sync on app open / foreground (no UI). */
+/** Google Calendar sync + local reminders / push registration (no UI). */
 function AutoSync() {
   useAutoSync(true);
+  useNotifications();
   return null;
 }

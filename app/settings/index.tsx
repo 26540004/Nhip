@@ -52,6 +52,8 @@ export default function SettingsScreen() {
             disabled={!profile}
             onValueChange={(v) => updateProfile.mutate({ ai_privacy_mode: v })}
             trackColor={{ true: colors.primary, false: colors.surface2 }}
+            thumbColor={colors.textHeading}
+            {...({ activeThumbColor: colors.textHeading } as object)}
           />
         </View>
         <AppText variant="secondary" tone="muted">
@@ -71,6 +73,19 @@ export default function SettingsScreen() {
         <Ionicons name="logo-google" size={20} color={colors.textBody} />
         <AppText variant="body" tone="heading" style={styles.flex}>
           {vi.google.title}
+        </AppText>
+        <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
+      </Pressable>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={vi.reminders.title}
+        onPress={() => router.push('/settings/reminders')}
+        style={[styles.link, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      >
+        <Ionicons name="notifications-outline" size={20} color={colors.textBody} />
+        <AppText variant="body" tone="heading" style={styles.flex}>
+          {vi.reminders.title}
         </AppText>
         <Ionicons name="chevron-forward" size={18} color={colors.textMuted} />
       </Pressable>

@@ -65,7 +65,7 @@
     "export:web": "expo export --platform web",
     "lint": "eslint .",
     "format": "prettier --write \"app/**/*.{ts,tsx}\" \"src/**/*.{ts,tsx}\" \"supabase/functions/**/*.ts\" scripts/eval-parse.ts",
-    "check:functions": "for f in parse-task propose-plan gcal-sync gcal-auth; do (cd supabase/functions/$f && deno check index.ts) || exit 1; done",
+    "check:functions": "for f in parse-task propose-plan gcal-sync gcal-auth push-dispatch; do (cd supabase/functions/$f && deno check index.ts) || exit 1; done",
     "build:demo": "node scripts/build-demo.mjs"
   },
   "private": true,

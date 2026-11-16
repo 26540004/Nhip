@@ -139,6 +139,66 @@ export const vi = {
     syncError: 'Đồng bộ thất bại — chạm để xem',
   },
 
+  brief: {
+    title: 'Tóm tắt buổi sáng',
+    load: 'Khối lượng hôm nay',
+    top: 'Ưu tiên hôm nay',
+    dueSoon: 'Hạn chót trong 7 ngày',
+    warnings: 'Cảnh báo',
+    scheduledOf: (sch: string, est: string) => `đã xếp ${sch} / ${est}`,
+    notScheduled: 'chưa xếp lịch',
+    openToday: 'Xem Hôm nay',
+    dismiss: 'Ẩn tóm tắt hôm nay',
+    viewFull: 'Xem chi tiết',
+    noTasks: 'Không có việc nào đang mở.',
+  },
+
+  evening: {
+    title: 'Tổng kết buổi tối',
+    unfinished: 'Chưa xong hôm nay',
+    done: 'Xong',
+    tomorrow: 'Dời sang mai',
+    aiReplan: '✦ Để AI xếp lại',
+    drop: 'Bỏ',
+    allClear: 'Không còn việc dang dở. Nghỉ ngơi thôi!',
+    actualQuestion: (title: string) => `Hôm nay việc "${title}" thật sự mất bao lâu?`,
+    actualHint: 'Số phút — giúp Nhịp ước tính sát hơn lần sau',
+    replanAll: (n: number) => `✦ Xếp lại ${n} việc đã dời`,
+    handled: 'Đã xử lý',
+    movedTomorrow: 'Đã dời sang mai',
+    queued: 'Sẽ xếp lại',
+    dropped: 'Đã bỏ',
+  },
+
+  reminders: {
+    title: 'Nhắc nhở',
+    enableTitle: 'Bật thông báo nhắc việc',
+    enableBody:
+      'Nhịp nhắc bạn trước giờ bắt đầu mỗi khối việc, gửi tóm tắt buổi sáng, tổng kết buổi tối và nhắc hạn chót. Bạn có thể đổi giờ hoặc tắt trong Cài đặt → Nhắc nhở.',
+    enable: 'Bật thông báo',
+    later: 'Để sau',
+    denied: 'Thông báo đang tắt. Bật lại trong Cài đặt của iPhone → Nhịp → Thông báo.',
+    webNote: 'Trên web không có thông báo nhắc giờ. Dùng app trên iPhone để nhận nhắc nhở.',
+    morning: 'Tóm tắt buổi sáng',
+    evening: 'Tổng kết buổi tối',
+    startOffset: 'Nhắc trước giờ bắt đầu',
+    deadlineOffsets: 'Nhắc hạn chót trước',
+    quiet: 'Giờ yên lặng',
+    quietFrom: 'Từ',
+    quietTo: 'Đến',
+    time: 'Giờ',
+    invalidTime: 'Giờ dạng HH:mm, ví dụ 07:00',
+    offsetOptions: [
+      { minutes: 10080, label: '7 ngày' },
+      { minutes: 4320, label: '3 ngày' },
+      { minutes: 1440, label: '1 ngày' },
+      { minutes: 180, label: '3 giờ' },
+      { minutes: 60, label: '1 giờ' },
+    ],
+    startOptions: [0, 5, 10, 15, 30],
+    minutesShort: (m: number) => (m === 0 ? 'Đúng giờ' : `${m} phút`),
+  },
+
   demo: {
     banner:
       'Bản demo — dữ liệu mẫu, chỉ lưu trong trình duyệt này. Thêm nhanh và xếp lịch chạy bằng quy tắc (không gọi AI), Google Calendar không kết nối.',
@@ -304,7 +364,7 @@ export const vi = {
     aiUsage: (n: number) => `Lượt AI hôm nay: ${n}`,
     privacy: 'Không gửi nội dung ghi chú cho AI',
     privacyHelp: 'Khi bật, AI chỉ nhận tiêu đề, thời lượng, hạn chót và giờ. Chuyển giọng nói thành chữ và tóm tắt ghi chú sẽ tắt.',
-    moreLater: 'Giờ hành chính, thời khóa biểu, sức chứa và nhắc nhở có ở các giai đoạn tiếp theo.',
+    moreLater: 'Giờ hành chính, thời khóa biểu và sức chứa mỗi ngày có ở giai đoạn 6.',
   },
 
   comingSoon: {

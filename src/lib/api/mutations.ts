@@ -47,6 +47,13 @@ const MUTATIONS = {
     if (!uid) throw new Error('unauthorized');
     return unwrap(await db.from('profiles').update(patch).eq('id', uid).select('id'));
   },
+  reminderUpdate: async (patch: Record<string, unknown>) => {
+    const db = requireSupabase();
+    const { data } = await db.auth.getSession();
+    const uid = data.session?.user.id;
+    if (!uid) throw new Error('unauthorized');
+    return unwrap(await db.from('reminder_settings').update(patch).eq('user_id', uid).select('user_id'));
+  },
   linkDelete: async (id: string) => unwrap(await requireSupabase().from('attachments').delete().eq('id', id).select('id')),
   linkCreate: async (rows: LinkAttachmentCreate[]) =>
     unwrap(
@@ -267,6 +274,21 @@ export function useUpdateProfile() {
     scope: SCOPE,
     onMutate: async (patch) => {
       qc.setQueryData<SettingsBundle>(qk.settings, (old) => (old && old.profile ? { ...old, profile: { ...old.profile, ...patch } } : old));
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: qk.settings }),
+  });
+}
+
+export function useUpdateReminders() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ['reminderUpdate'],
+    mutationFn: MUTATIONS.reminderUpdate,
+    scope: SCOPE,
+    onMutate: async (patch) => {
+      qc.setQueryData<SettingsBundle>(qk.settings, (old) =>
+        old && old.reminders ? { ...old, reminders: { ...old.reminders, ...patch } } : old,
+      );
     },
     onSettled: () => qc.invalidateQueries({ queryKey: qk.settings }),
   });
