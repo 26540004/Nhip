@@ -5,6 +5,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { requireSupabase, unwrap } from './supabase';
 import type {
+  AudioSegment,
   Attachment,
   BusyRow,
   CapacityRow,
@@ -31,7 +32,11 @@ export const qk = {
   search: (q: string) => ['search', q] as const,
   profile: ['profile'] as const,
   taskBlocks: (taskId: string) => ['taskBlocks', taskId] as const,
-  links: (ownerId: string) => ['links', ownerId] as const,
+  /** All attachments (images, audio, links) of a note or task. */
+  attachments: (ownerId: string) => ['attachments', ownerId] as const,
+  links: (ownerId: string) => ['attachments', ownerId] as const,
+  segments: (attachmentId: string) => ['segments', attachmentId] as const,
+  signedUrl: (path: string) => ['signedUrl', path] as const,
   google: ['google'] as const,
   proposal: (id: string) => ['proposal', id] as const,
   proposedBlocks: (from: string, to: string) => ['proposedBlocks', from, to] as const,
@@ -217,20 +222,62 @@ export function useTaskBlocks(taskId: string | undefined) {
   });
 }
 
+export const ATTACHMENT_COLUMNS =
+  'id, owner_type, owner_id, type, storage_path, url, title, meta_json, created_at, updated_at, duration_sec, bookmarks_json, transcript_status, transcript_text, summary_json';
+
+/** All attachments of a task or note, oldest first. */
+export function useAttachments(ownerId: string | undefined, opts: { poll?: boolean } = {}) {
+  return useQuery({
+    queryKey: qk.attachments(ownerId ?? ''),
+    enabled: Boolean(ownerId),
+    refetchInterval: opts.poll ? 4000 : false,
+    queryFn: async () =>
+      unwrap(
+        await requireSupabase().from('attachments').select(ATTACHMENT_COLUMNS).eq('owner_id', ownerId!).order('created_at'),
+      ) as Attachment[],
+  });
+}
+
 /** Link attachments of a task or note. */
 export function useLinks(ownerId: string | undefined) {
+  const q = useAttachments(ownerId);
+  return { ...q, data: q.data?.filter((a) => a.type === 'link') };
+}
+
+/** Segments of a recording; polled while transcription runs. */
+export function useSegments(attachmentId: string | undefined, poll = false) {
   return useQuery({
-    queryKey: qk.links(ownerId ?? ''),
-    enabled: Boolean(ownerId),
+    queryKey: qk.segments(attachmentId ?? ''),
+    enabled: Boolean(attachmentId),
+    refetchInterval: poll ? 4000 : false,
     queryFn: async () =>
       unwrap(
         await requireSupabase()
-          .from('attachments')
-          .select('id, owner_type, owner_id, type, storage_path, url, title, meta_json, created_at')
-          .eq('owner_id', ownerId!)
-          .eq('type', 'link')
-          .order('created_at'),
-      ) as Attachment[],
+          .from('audio_segments')
+          .select(
+            'id, attachment_id, seq, storage_path, mime, start_offset_sec, duration_sec, uploaded, transcript_status, transcript_json, last_error',
+          )
+          .eq('attachment_id', attachmentId!)
+          .order('seq'),
+      ) as AudioSegment[],
+  });
+}
+
+const SIGNED_URL_TTL_SEC = 3600;
+
+/** Short-lived URL for a private storage object. Never persisted (it expires). */
+export function useSignedUrl(path: string | null | undefined) {
+  return useQuery({
+    queryKey: qk.signedUrl(path ?? ''),
+    enabled: Boolean(path),
+    staleTime: (SIGNED_URL_TTL_SEC - 600) * 1000,
+    gcTime: (SIGNED_URL_TTL_SEC - 300) * 1000,
+    meta: { persist: false },
+    queryFn: async () => {
+      const { data, error } = await requireSupabase().storage.from('attachments').createSignedUrl(path!, SIGNED_URL_TTL_SEC);
+      if (error || !data) throw error ?? new Error('no url');
+      return data.signedUrl;
+    },
   });
 }
 

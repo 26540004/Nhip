@@ -17,7 +17,7 @@ Ba vấn đề cốt lõi: dồn quá nhiều việc vào một ngày → giới
 | **2. Dữ liệu & Việc** | Đăng nhập Apple/Google, truy vấn có kiểu + hàng đợi ghi offline, Việc (nhóm, lọc, chi tiết, việc con, liên kết), Ghi chú (danh sách, soạn thảo tự lưu, checklist → việc), Hôm nay dùng dữ liệu thật, Tìm kiếm, Môn học & dự án, Quick Add + Edge Function `parse-task` (Gemini → Groq), 34 fixture ngày giờ tiếng Việt | ✅ Xong |
 | **3. Lịch & AI xếp lịch** | `gcal-auth` (OAuth, Vault, lịch riêng "Nhịp"), `gcal-sync` (2 chiều, syncToken, 410, thu hồi quyền), `propose-plan` (AI đề xuất → code kiểm tra/sửa/bổ sung, dự phòng không AI, Cân bằng lại, Xếp lịch việc này), màn duyệt đề xuất + Hoàn tác 10 s, màn Lịch Ngày/3 ngày/Tuần với kéo thả và "Đổi giờ", cài đặt Google | ✅ Xong |
 | **4. Nhắc nhở** | Nhắc trước giờ bắt đầu khối (thông báo cục bộ, tối đa 50, nút "Bắt đầu" / "Hoãn 15 phút"), đăng ký push token, `push-dispatch` (tóm tắt sáng, tổng kết tối, nhắc hạn chót, giờ yên lặng, chống gửi trùng), màn `/brief`, `/review`, thẻ tóm tắt trên Hôm nay, Cài đặt → Nhắc nhở | ✅ Xong |
-| 5. Ghi âm & Ghi chú giàu nội dung | Trình soạn thảo, ảnh, link preview, ghi âm nền theo đoạn, `transcribe-audio`, tóm tắt | ⏳ |
+| **5. Ghi âm & Ghi chú giàu nội dung** | Trình soạn thảo khối (tiêu đề, đậm/nghiêng, danh sách, checklist → việc), ảnh (nén 1920 px, thumbnail, xem phóng to), thẻ liên kết (`link-preview`, chống SSRF), ghi âm nền chia đoạn 10 phút + tải lên nền + phát lại có đánh dấu, `transcribe-audio` (từng đoạn, thử lại, tóm tắt, bài tập → việc), `note-ai` (tóm tắt ghi chú, tìm việc), ảnh & ghi âm trong chi tiết việc | ✅ Xong |
 | 6. Hoàn thiện | Onboarding, Cài đặt đầy đủ, seed, xuất dữ liệu, QA trên iPhone thật | ⏳ |
 
 Các màn hình chưa tới giai đoạn của mình hiển thị trạng thái "Đang xây dựng" — không có nút giả.
@@ -73,14 +73,43 @@ Lõi lập lịch nằm ở `supabase/functions/_shared/planning/` và được 
 - Cần `EAS_PROJECT_ID` để lấy push token. Tùy chọn: `EXPO_ACCESS_TOKEN` (secret của Edge Function) nếu bật bảo mật push trên Expo.
 - Deploy: `npx supabase functions deploy push-dispatch` (cron gọi bằng service key; hàm từ chối mọi lời gọi khác).
 
+
+## Ghi chú giàu nội dung
+
+- **Trình soạn thảo** viết bằng component gốc (không WebView), chạy giống nhau trên iPhone và web. Nội dung lưu dạng JSON trong `notes.content_json`: danh sách khối `h1`, `h2`, `p`, `bullet`, `number`, `check`, `image`, `link`, `audio` (`src/lib/notes/doc.ts`, có test). Đậm/nghiêng là `**…**` / `_…_` trong khối chữ: khi không gõ, khối hiện chữ đã định dạng; chạm vào để sửa. `Ctrl/⌘+B`, `Ctrl/⌘+I` trên web.
+- Enter tách khối (danh sách tự nối tiếp, Enter ở mục trống thì thoát danh sách); Backspace ở đầu khối gộp lên khối trên. Dán nhiều dòng → mỗi dòng một khối.
+- Thanh công cụ dính trên đầu: 📷 🎙 🔗 ☑ ✦ AI, rồi H1/H2, **B**/_I_, danh sách. Dòng checklist có nút "Chuyển thành việc" (việc gắn với ghi chú, mũi tên xanh mở việc).
+- Ghi chú cũ dạng văn bản thường (giai đoạn 2) được chuyển tự động khi mở. `plain_text` luôn được tính lại để tìm kiếm.
+- Tự lưu 2 giây sau thay đổi cuối, khi rời màn hình và khi app vào nền ("Đã lưu").
+- **✦ AI** (`note-ai`): *Tóm tắt ghi chú* (ý chính, thuật ngữ, bài tập — "Chèn vào ghi chú") và *Tìm việc cần làm* (gợi ý, bạn chọn việc nào để tạo; ngày giờ do code tính như Quick Add). Gửi cả bản chép lời của các ghi âm trong ghi chú. Tắt khi bật chế độ riêng tư.
+
+## Ảnh và liên kết
+
+- Chụp hoặc chọn nhiều ảnh → nén cạnh dài ≤ 1920 px, JPEG ~80 % + thumbnail 480 px → lưu ngay trên máy (hiện tức thì, kể cả offline) → hàng đợi tải lên nền vào bucket private `attachments/<user_id>/…`. Thiết bị khác xem qua signed URL (1 giờ, không lưu vào cache đĩa). Chạm ảnh để xem toàn màn hình: chụm để phóng to, kéo, chạm hai lần.
+- Liên kết hiện thành thẻ (tiêu đề, mô tả, ảnh, tên trang) lấy từ `link-preview`: chỉ http(s) cổng mặc định, chặn localhost/IP nội bộ/metadata (kiểm tra cả DNS và từng bước chuyển hướng, tối đa 3), 5 giây, đọc tối đa 512 KB, chỉ trả văn bản đã làm sạch. Mở bằng trình duyệt trong app.
+- Xóa ghi chú/việc/khối media xóa luôn file trên Storage.
+
+## Ghi âm bài giảng & phiên âm
+
+- Mở từ 🎙 trong ghi chú, nút micro ở tab Ghi chú (tạo ghi chú mới trong môn/dự án bạn chọn) hoặc "Ghi âm" trong chi tiết việc.
+- Đồng hồ cỡ lớn, mức âm, tạm dừng/tiếp tục, **Đánh dấu** (hiện thành vạch trên thanh phát), **Dừng & lưu**. Có thể khóa màn hình hoặc chuyển màn khác — viên "● Đang ghi" ở góc dưới đưa bạn quay lại.
+- AAC mono ~40 kbps. Cứ ~10 phút app đóng đoạn hiện tại, chép vào Documents, tạo bản ghi `audio_segments` và đưa vào hàng đợi tải lên nền (phiên tải nền của iOS) rồi ghi tiếp. App bị tắt giữa chừng chỉ mất đoạn đang ghi; lần mở sau các đoạn đã đóng được giữ lại.
+- Bị gián đoạn (cuộc gọi, Siri, app khác dùng micro): ghi âm tạm dừng, có thông báo nếu app đang ở nền; nhấn **Tiếp tục** để ghi tiếp sang đoạn mới.
+- Phát lại liền mạch qua các đoạn, tua bằng thanh hoặc ±15 giây, tốc độ 1–2×, chạm dòng chép lời hoặc dấu đánh dấu để nhảy tới.
+- **Phiên âm & tóm tắt** (`transcribe-audio`): mỗi đoạn được gửi riêng, lần lượt (không chạy song song hai đoạn của cùng bản ghi): Gemini (audio) trước, Groq Whisper dự phòng. Mốc thời gian được cộng vị trí đoạn. Lỗi tạm thời thử lại sau 30 giây/2 phút (tối đa 3 lần), vượt giới hạn tốc độ thì chờ lâu hơn mà không tính lượt. App hiện "Đang xử lý đoạn 3/12"; đoạn lỗi có nút **Thử lại** riêng. Xong tất cả → bản chép lời đầy đủ + tóm tắt `{ý chính, thuật ngữ, bài tập}`; mỗi bài tập có **Tạo việc từ đây** (hạn chót "thứ 6 tuần sau" được code tính).
+- Việc xử lý chạy nền trên máy chủ (`EdgeRuntime.waitUntil`) và pg_cron chạy tiếp mỗi phút khi còn đoạn chờ, nên không cần giữ app mở. Bản chép lời được tìm kiếm cùng việc và ghi chú.
+- Chế độ riêng tư bật → không gửi âm thanh cho AI (nút phiên âm được thay bằng lời giải thích).
+- Web: ghi được (WebM/MP4 tùy trình duyệt, WebM đi qua Whisper trước) nhưng phải giữ tab mở — app ghi "Ghi âm dài nên dùng trên iPhone".
+
 ## Bản demo trên trình duyệt
 
-`npm run build:demo` tạo `dist-demo/`: app chạy hoàn toàn trong trình duyệt với dữ liệu mẫu (`src/lib/api/demo/`): một client giả lập Supabase trong bộ nhớ, Thêm nhanh bằng quy tắc thay cho AI, xếp lịch bằng lõi lập lịch thật nhưng không gọi AI. Không cần Supabase, khóa AI hay Google. Dữ liệu lưu trong `localStorage` nếu có. Đường dẫn tài nguyên là tương đối nên có thể đặt ở bất kỳ thư mục nào.
+`npm run build:demo` tạo `dist-demo/`: app chạy hoàn toàn trong trình duyệt với dữ liệu mẫu (`src/lib/api/demo/`): một client giả lập Supabase trong bộ nhớ, Thêm nhanh bằng quy tắc thay cho AI, xếp lịch bằng lõi lập lịch thật nhưng không gọi AI. Ghi chú "Bài giảng TCP/IP – tuần 5" có sẵn ảnh bảng, thẻ liên kết và một bản ghi đã phiên âm + tóm tắt (bản demo không kèm tệp âm thanh mẫu). Ghi âm thật trong trình duyệt được; phần phiên âm/AI ghi chú trong demo là nội dung mẫu. Không cần Supabase, khóa AI hay Google. Dữ liệu lưu trong `localStorage` nếu có. Đường dẫn tài nguyên là tương đối nên có thể đặt ở bất kỳ thư mục nào.
 
 ## Ngoại tuyến
 
 - Đọc: Hôm nay, Việc, Ghi chú được cache (AsyncStorage / localStorage) 7 ngày.
 - Ghi: tạo/sửa/xong/xóa việc, sửa ghi chú… được xếp hàng theo đúng thứ tự (một scope duy nhất), lưu lại kể cả khi đóng app, và gửi khi có mạng. Header hiện "Chờ đồng bộ · n". ID tạo ở máy nên việc con/liên kết tạo offline vẫn gắn đúng.
+- Ảnh và đoạn ghi âm: lưu trên máy trước, tải lên khi có mạng (thử lại giãn dần tới 10 phút); yêu cầu phiên âm làm offline được gửi khi có mạng.
 - AI: hiện "Cần kết nối mạng".
 
 ## Cấu trúc
@@ -91,12 +120,15 @@ app/                      Expo Router (routes)
   settings/               Cài đặt
 src/
   components/             AppText, Button, Card, CapacityBar, DayTimeline, Sheet, SpaceFilterControl, EmptyState, AppTabBar
-  features/               today, quick-add, … (mỗi tính năng một thư mục)
+  features/               today, quick-add, notes (trình soạn thảo), media (ảnh, link, ghi âm, phát lại),
+                          record (bộ ghi nền), … (mỗi tính năng một thư mục)
   hooks/                  useResponsive, useKeyboardShortcuts, useNow
   lib/
     time/                 tz.ts, intervals.ts, slots.ts, format.ts
     planning/             capacity.ts, priority.ts, engine.ts, validatePlan.ts, greedyPlan.ts
     notifications/        local.ts (bộ lập lịch giới hạn 64 của iOS)
+    notes/                doc.ts (mô hình nội dung ghi chú)
+    media/                hàng đợi tải lên, ảnh, tệp trên máy, tiện ích ghi âm
     api/                  supabase.ts, queryClient.ts
   stores/                 ui.ts (Zustand)
   theme/                  tokens.ts, typography.ts, ThemeProvider.tsx
@@ -105,8 +137,9 @@ src/
 supabase/
   migrations/             schema, RLS, tìm kiếm, cron
   functions/
-    _shared/              ai-provider (Gemini/Groq + fallback), vi-parse, parse-task-core, http, context
-    parse-task/           Edge Function Quick Add
+    _shared/              ai-provider (Gemini/Groq + fallback), vi-parse, parse-task-core, planning/, google, brief-core,
+                          link-preview-core, transcribe-core, note-ai-core, http, context
+    parse-task/ propose-plan/ gcal-auth/ gcal-sync/ push-dispatch/ link-preview/ transcribe-audio/ note-ai/
 scripts/db-check/         chạy migrations trên Postgres tạm + kiểm tra RLS
 ```
 
@@ -139,7 +172,8 @@ npm run ios                 # cần development build (xem EAS bên dưới)
 
 ```bash
 npm test                    # Jest: tz, slots, capacity, priority, validatePlan/greedyPlan, thông báo,
-                            #       ngày giờ tiếng Việt, pipeline parse-task (provider giả), nhóm việc, checklist
+                            #       ngày giờ tiếng Việt, pipeline parse-task (provider giả), nhóm việc, checklist,
+                            #       mô hình ghi chú, link preview + SSRF, phiên âm (fallback, thử lại, ghép đoạn), hàng đợi tải lên
 npm run typecheck           # tsc --noEmit
 npm run lint                # ESLint (eslint-config-expo)
 npm run check:functions     # deno check tất cả Edge Functions (cần Deno)
@@ -165,14 +199,14 @@ cd scripts/db-check && npm install && npm run check   # migrations + RLS trên P
    select vault.create_secret('https://<project-ref>.supabase.co', 'project_url');
    select vault.create_secret('<service-role-key>', 'service_role_key');
    ```
-   Cron gọi `gcal-sync` mỗi 15 phút và `push-dispatch` mỗi 5 phút. Trước khi các function đó được deploy (giai đoạn 3–4) lời gọi chỉ trả 404 và bị bỏ qua.
+   Cron gọi `gcal-sync` mỗi 15 phút, `push-dispatch` mỗi 5 phút và `transcribe-audio` mỗi phút (chỉ khi còn đoạn ghi âm chờ xử lý). Trước khi các function đó được deploy lời gọi chỉ trả 404 và bị bỏ qua.
 5. Auth → URL Configuration → Redirect URLs: thêm `nhip://auth/callback` (iPhone) và địa chỉ web của bạn (vd. `https://nhip.example.com`, `http://localhost:8081`).
 6. Auth → Providers:
    - **Google**: tạo OAuth client loại *Web application* trong Google Cloud (có thể dùng chung project với Calendar ở giai đoạn 3), redirect URI `https://<project-ref>.supabase.co/auth/v1/callback`, dán Client ID/Secret vào Supabase.
    - **Apple**: trên iPhone app dùng nút đăng nhập Apple gốc (`signInWithIdToken`) — thêm bundle id `app.nhip.planner` (và `.preview`, `.dev`) vào ô *Client IDs* của provider Apple. Đăng nhập Apple trên web cần thêm Services ID + khóa `.p8` (xem tài liệu Supabase "Login with Apple"); nếu chỉ dùng web, đăng nhập Google là đủ.
 7. Deploy Edge Function và đặt secrets:
    ```bash
-   npx supabase secrets set GEMINI_API_KEY=… GEMINI_MODEL=… GROQ_API_KEY=… GROQ_MODEL=… AI_DAILY_CALL_LIMIT=200
+   npx supabase secrets set GEMINI_API_KEY=… GEMINI_MODEL=… GROQ_API_KEY=… GROQ_MODEL=… GROQ_STT_MODEL=… AI_DAILY_CALL_LIMIT=200
    npx supabase secrets set GOOGLE_OAUTH_CLIENT_ID=… GOOGLE_OAUTH_CLIENT_SECRET=… \
      GOOGLE_OAUTH_REDIRECT_URI=https://<project-ref>.supabase.co/functions/v1/gcal-auth/callback \
      WEB_APP_URL=https://<địa-chỉ-web-của-bạn>
@@ -181,8 +215,11 @@ cd scripts/db-check && npm install && npm run check   # migrations + RLS trên P
    npx supabase functions deploy gcal-sync
    npx supabase functions deploy gcal-auth --no-verify-jwt   # Google redirect không mang JWT; hàm tự kiểm tra
    npx supabase functions deploy push-dispatch
+   npx supabase functions deploy link-preview
+   npx supabase functions deploy transcribe-audio
+   npx supabase functions deploy note-ai
    ```
-   Lấy key Gemini miễn phí tại aistudio.google.com, key Groq tại console.groq.com. Đặt `GEMINI_MODEL` là model Flash miễn phí mới nhất đang có trong AI Studio; `GROQ_MODEL` là một model chat hỗ trợ JSON mode.
+   Lấy key Gemini miễn phí tại aistudio.google.com, key Groq tại console.groq.com. Đặt `GEMINI_MODEL` là model Flash miễn phí mới nhất đang có trong AI Studio (cần nhận âm thanh); `GROQ_MODEL` là một model chat hỗ trợ JSON mode; `GROQ_STT_MODEL` là model Whisper của Groq (dự phòng phiên âm, bỏ trống = không dự phòng).
 
 Bucket lưu trữ `attachments` được tạo ở chế độ **private**; file nằm dưới `<user_id>/…` và chỉ đọc qua signed URL.
 
@@ -195,6 +232,8 @@ Bucket lưu trữ `attachments` được tạo ở chế độ **private**; file
 | `EAS_PROJECT_ID` | `.env` / EAS | sau `eas init` |
 | `GEMINI_API_KEY`, `GEMINI_MODEL` | `supabase secrets set` | model Flash miễn phí mới nhất, không hardcode |
 | `GROQ_API_KEY`, `GROQ_MODEL` | `supabase secrets set` | dự phòng cho tác vụ văn bản |
+| `GROQ_STT_MODEL` | `supabase secrets set` | model Whisper của Groq — dự phòng phiên âm (tùy chọn) |
+| `GEMINI_BASE_URL`, `GROQ_BASE_URL` | `supabase secrets set` | tùy chọn, khi đi qua API gateway/proxy |
 | `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI` | `supabase secrets set` | giai đoạn 3 |
 | `AI_DAILY_CALL_LIMIT` | `supabase secrets set` | mặc định 200 |
 | `WEB_APP_URL` | `supabase secrets set` | địa chỉ web của app (link trong sự kiện Google, cho phép quay lại sau OAuth) |

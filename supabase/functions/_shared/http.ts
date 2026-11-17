@@ -24,6 +24,9 @@ export type ErrorCode =
   | 'gcal_revoked'
   | 'gcal_failed'
   | 'no_tasks'
+  | 'link_blocked'
+  | 'link_failed'
+  | 'not_ready'
   | 'internal';
 
 export function errorResponse(code: ErrorCode, status: number, detail?: string): Response {

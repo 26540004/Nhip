@@ -2,5 +2,5 @@
 export function routeFromUrl(url: unknown): string | null {
   if (typeof url !== 'string' || !url.startsWith('nhip://')) return null;
   const path = `/${url.slice('nhip://'.length).replace(/^\/+/, '')}`;
-  return /^\/(task\/[\w-]+|brief|review|plan(\?.*)?|calendar|tasks|notes)$/.test(path) ? path : '/';
+  return /^\/(task\/[\w-]+|note\/[\w-]+|brief|review|record|plan(\?.*)?|calendar|tasks|notes)$/.test(path) ? path : '/';
 }

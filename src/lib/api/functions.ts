@@ -1,7 +1,7 @@
 /** Typed calls to Edge Functions. AI keys never leave the server. */
 import { onlineManager } from '@tanstack/react-query';
 import { ApiError, requireSupabase } from './supabase';
-import type { ParseTaskResponse } from './types';
+import type { ParsedTask, ParseTaskResponse, TranscriptSummary } from './types';
 
 async function invoke<T>(name: string, body: Record<string, unknown>): Promise<T> {
   if (!onlineManager.isOnline()) throw new ApiError('offline');
@@ -92,4 +92,47 @@ export function gcalDisconnect(): Promise<{ ok: true }> {
 
 export function gcalSync(): Promise<SyncResult> {
   return invoke('gcal-sync', {});
+}
+
+// ---------------------------------------------------------------------------
+// Media & note AI
+// ---------------------------------------------------------------------------
+
+export interface LinkPreviewDto {
+  url: string;
+  title: string | null;
+  description: string | null;
+  image: string | null;
+  site_name: string | null;
+}
+
+export function linkPreview(url: string): Promise<LinkPreviewDto> {
+  return invoke<LinkPreviewDto>('link-preview', { url });
+}
+
+export interface TranscribeStatus {
+  transcript_status: 'none' | 'processing' | 'done' | 'failed';
+  total: number;
+  done: number;
+  failed: number;
+}
+
+export function transcribe(
+  attachmentId: string,
+  action: 'start' | 'retry' | 'summarize' | 'process',
+  segmentId?: string,
+): Promise<TranscribeStatus> {
+  return invoke<TranscribeStatus>('transcribe-audio', {
+    attachment_id: attachmentId,
+    action,
+    ...(segmentId ? { segment_id: segmentId } : {}),
+  });
+}
+
+export function noteSummarize(noteId: string): Promise<{ summary: TranscriptSummary; provider: string }> {
+  return invoke('note-ai', { note_id: noteId, action: 'summarize' });
+}
+
+export function noteExtractTasks(noteId: string): Promise<{ tasks: ParsedTask[]; provider: string }> {
+  return invoke('note-ai', { note_id: noteId, action: 'extract_tasks' });
 }

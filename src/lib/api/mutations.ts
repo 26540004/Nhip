@@ -10,7 +10,7 @@ import { type QueryClient, useMutation, useMutationState, useQueryClient } from 
 import * as Crypto from 'expo-crypto';
 import { qk, type NoteListItem, type SettingsBundle } from './queries';
 import { requireSupabase, unwrap } from './supabase';
-import type { Collection, Note, Task } from './types';
+import type { Attachment, AudioSegment, Collection, Note, Task } from './types';
 
 const SCOPE = { id: 'nhip-sync' };
 
@@ -29,15 +29,76 @@ export interface LinkAttachmentCreate {
   title?: string | null;
 }
 
+export type AttachmentCreate = Pick<Attachment, 'id' | 'owner_type' | 'owner_id' | 'type'> &
+  Partial<Pick<Attachment, 'storage_path' | 'url' | 'title' | 'meta_json' | 'duration_sec' | 'bookmarks_json'>>;
+export type AttachmentPatch = Partial<
+  Pick<Attachment, 'title' | 'url' | 'meta_json' | 'duration_sec' | 'bookmarks_json' | 'owner_id' | 'owner_type'>
+>;
+export interface SegmentCreate {
+  id: string;
+  attachment_id: string;
+  seq: number;
+  storage_path: string;
+  mime: string;
+  start_offset_sec: number;
+  duration_sec: number;
+  uploaded?: boolean;
+}
+
+/** Storage objects (files, thumbnails, audio segments) that belong to these owners. */
+async function ownedObjectPaths(ownerIds: string[]): Promise<string[]> {
+  const db = requireSupabase();
+  const atts = unwrap(await db.from('attachments').select('id, storage_path, meta_json').in('owner_id', ownerIds)) as Pick<
+    Attachment,
+    'id' | 'storage_path' | 'meta_json'
+  >[];
+  return attachmentObjectPaths(atts);
+}
+
+async function attachmentObjectPaths(atts: Pick<Attachment, 'id' | 'storage_path' | 'meta_json'>[]): Promise<string[]> {
+  if (atts.length === 0) return [];
+  const segs = unwrap(
+    await requireSupabase()
+      .from('audio_segments')
+      .select('storage_path')
+      .in(
+        'attachment_id',
+        atts.map((a) => a.id),
+      ),
+  ) as { storage_path: string }[];
+  const paths = atts.flatMap((a) => [a.storage_path, typeof a.meta_json?.thumb_path === 'string' ? a.meta_json.thumb_path : null]);
+  return [...paths, ...segs.map((x) => x.storage_path)].filter((p): p is string => Boolean(p));
+}
+
+/** Best effort: a leftover file is harmless (private bucket), a failed row delete is not. */
+async function removeObjects(paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  try {
+    await requireSupabase().storage.from('attachments').remove(paths);
+  } catch {
+    /* ignore */
+  }
+}
+
 const MUTATIONS = {
   taskCreate: async (rows: TaskCreate[]) => unwrap(await requireSupabase().from('tasks').insert(rows).select('id')),
   taskUpdate: async ({ id, patch }: { id: string; patch: TaskPatch }) =>
     unwrap(await requireSupabase().from('tasks').update(patch).eq('id', id).select('id')),
-  taskDelete: async (id: string) => unwrap(await requireSupabase().from('tasks').delete().eq('id', id).select('id')),
+  taskDelete: async (id: string) => {
+    const paths = await ownedObjectPaths([id]).catch(() => []);
+    const res = unwrap(await requireSupabase().from('tasks').delete().eq('id', id).select('id'));
+    await removeObjects(paths);
+    return res;
+  },
   noteCreate: async (row: NoteCreate) => unwrap(await requireSupabase().from('notes').insert(row).select('id')),
   noteUpdate: async ({ id, patch }: { id: string; patch: NotePatch }) =>
     unwrap(await requireSupabase().from('notes').update(patch).eq('id', id).select('id')),
-  noteDelete: async (id: string) => unwrap(await requireSupabase().from('notes').delete().eq('id', id).select('id')),
+  noteDelete: async (id: string) => {
+    const paths = await ownedObjectPaths([id]).catch(() => []);
+    const res = unwrap(await requireSupabase().from('notes').delete().eq('id', id).select('id'));
+    await removeObjects(paths);
+    return res;
+  },
   collectionUpsert: async (row: Pick<Collection, 'id' | 'space' | 'kind' | 'name'> & Partial<Collection>) =>
     unwrap(await requireSupabase().from('collections').upsert(row).select('id')),
   profileUpdate: async (patch: { display_name?: string | null; ai_privacy_mode?: boolean }) => {
@@ -55,6 +116,23 @@ const MUTATIONS = {
     return unwrap(await db.from('reminder_settings').update(patch).eq('user_id', uid).select('user_id'));
   },
   linkDelete: async (id: string) => unwrap(await requireSupabase().from('attachments').delete().eq('id', id).select('id')),
+  attachmentCreate: async (row: AttachmentCreate) => unwrap(await requireSupabase().from('attachments').insert(row).select('id')),
+  attachmentUpdate: async ({ id, patch }: { id: string; patch: AttachmentPatch }) =>
+    unwrap(await requireSupabase().from('attachments').update(patch).eq('id', id).select('id')),
+  attachmentDelete: async (id: string) => {
+    const atts = unwrap(await requireSupabase().from('attachments').select('id, storage_path, meta_json').eq('id', id)) as Pick<
+      Attachment,
+      'id' | 'storage_path' | 'meta_json'
+    >[];
+    const paths = await attachmentObjectPaths(atts).catch(() => []);
+    const res = unwrap(await requireSupabase().from('attachments').delete().eq('id', id).select('id'));
+    await removeObjects(paths);
+    return res;
+  },
+  segmentCreate: async (row: SegmentCreate) =>
+    unwrap(await requireSupabase().from('audio_segments').upsert(row, { onConflict: 'attachment_id,seq' }).select('id')),
+  segmentUpdate: async ({ id, patch }: { id: string; patch: { uploaded?: boolean; duration_sec?: number } }) =>
+    unwrap(await requireSupabase().from('audio_segments').update(patch).eq('id', id).select('id')),
   linkCreate: async (rows: LinkAttachmentCreate[]) =>
     unwrap(
       await requireSupabase()
@@ -291,5 +369,118 @@ export function useUpdateReminders() {
       );
     },
     onSettled: () => qc.invalidateQueries({ queryKey: qk.settings }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Attachments (images, audio, links) and audio segments
+// ---------------------------------------------------------------------------
+
+function attachmentDefaults(row: AttachmentCreate): Attachment {
+  const ts = nowIso();
+  return {
+    storage_path: null,
+    url: null,
+    title: null,
+    meta_json: {},
+    duration_sec: null,
+    bookmarks_json: [],
+    transcript_status: 'none',
+    transcript_text: null,
+    summary_json: null,
+    created_at: ts,
+    updated_at: ts,
+    ...row,
+  };
+}
+
+export function useCreateAttachment() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ['attachmentCreate'],
+    mutationFn: MUTATIONS.attachmentCreate,
+    scope: SCOPE,
+    onMutate: async (row: AttachmentCreate) => {
+      qc.setQueryData<Attachment[]>(qk.attachments(row.owner_id), (old) => [
+        ...(old ?? []).filter((a) => a.id !== row.id),
+        attachmentDefaults(row),
+      ]);
+      qc.setQueryData<NoteListItem[]>(qk.notes, (old) =>
+        old?.map((n) => (n.id === row.owner_id ? { ...n, attachment_types: [...new Set([...(n.attachment_types ?? []), row.type])] } : n)),
+      );
+    },
+    onSettled: (_d, _e, row) => {
+      void qc.invalidateQueries({ queryKey: qk.attachments(row.owner_id) });
+      void qc.invalidateQueries({ queryKey: qk.notes });
+    },
+  });
+}
+
+export function useUpdateAttachment(ownerId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ['attachmentUpdate'],
+    mutationFn: MUTATIONS.attachmentUpdate,
+    scope: SCOPE,
+    onMutate: async ({ id, patch }: { id: string; patch: AttachmentPatch }) => {
+      qc.setQueryData<Attachment[]>(qk.attachments(ownerId), (old) => old?.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: qk.attachments(ownerId) }),
+  });
+}
+
+export function useDeleteAttachment(ownerId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: ['attachmentDelete'],
+    mutationFn: MUTATIONS.attachmentDelete,
+    scope: SCOPE,
+    onMutate: async (id: string) => {
+      qc.setQueryData<Attachment[]>(qk.attachments(ownerId), (old) => old?.filter((a) => a.id !== id));
+    },
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: qk.attachments(ownerId) });
+      void qc.invalidateQueries({ queryKey: qk.notes });
+    },
+  });
+}
+
+/**
+ * Segment writes outside React (the recorder and upload worker run in the background).
+ * They go through the same persisted, ordered queue as every other write.
+ */
+export function enqueueWrite<
+  K extends 'segmentCreate' | 'segmentUpdate' | 'attachmentUpdate' | 'attachmentCreate' | 'attachmentDelete' | 'taskCreate',
+>(client: QueryClient, key: K, variables: Parameters<(typeof MUTATIONS)[K]>[0]): Promise<unknown> {
+  // Optimistic cache updates (the hooks do this in onMutate).
+  if (key === 'attachmentCreate') {
+    const row = variables as AttachmentCreate;
+    client.setQueryData<Attachment[]>(qk.attachments(row.owner_id), (old) => [
+      ...(old ?? []).filter((a) => a.id !== row.id),
+      attachmentDefaults(row),
+    ]);
+  } else if (key === 'segmentCreate') {
+    const row = variables as SegmentCreate;
+    client.setQueryData<AudioSegment[]>(qk.segments(row.attachment_id), (old) => [
+      ...(old ?? []).filter((x) => x.seq !== row.seq),
+      { uploaded: false, transcript_status: 'none', transcript_json: null, last_error: null, ...row },
+    ]);
+  } else if (key === 'attachmentDelete') {
+    const id = variables as string;
+    client.setQueriesData<Attachment[]>({ queryKey: ['attachments'] }, (old) => old?.filter((a) => a.id !== id));
+  } else if (key === 'taskCreate') {
+    client.setQueryData<Task[]>(qk.tasks, (old) => [...(old ?? []), ...(variables as TaskCreate[]).map(taskDefaults)]);
+  } else if (key === 'attachmentUpdate') {
+    const { id, patch } = variables as { id: string; patch: AttachmentPatch };
+    client.setQueriesData<Attachment[]>({ queryKey: ['attachments'] }, (old) => old?.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+  }
+  const m = client.getMutationCache().build(client, client.defaultMutationOptions({ mutationKey: [key], scope: SCOPE }));
+  return m.execute(variables as never).then((r) => {
+    if (key === 'taskCreate') void client.invalidateQueries({ queryKey: qk.tasks });
+    else if (key === 'segmentCreate' || key === 'segmentUpdate') {
+      const attId = key === 'segmentCreate' ? (variables as SegmentCreate).attachment_id : null;
+      void client.invalidateQueries({ queryKey: attId ? qk.segments(attId) : ['segments'] });
+    } else void client.invalidateQueries({ queryKey: ['attachments'] });
+    return r;
   });
 }

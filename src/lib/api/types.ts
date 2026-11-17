@@ -88,6 +88,66 @@ export interface Attachment {
   title: string | null;
   meta_json: Record<string, unknown>;
   created_at: string;
+  duration_sec?: number | null;
+  bookmarks_json?: Bookmark[];
+  transcript_status?: 'none' | 'processing' | 'done' | 'failed';
+  transcript_text?: string | null;
+  summary_json?: TranscriptSummary | null;
+  updated_at?: string;
+}
+
+/** meta_json of an image attachment. */
+export interface ImageMeta {
+  width: number;
+  height: number;
+  thumb_path: string;
+}
+
+/** meta_json of a link attachment (sanitised by the link-preview function). */
+export interface LinkMeta {
+  description?: string | null;
+  image?: string | null;
+  site_name?: string | null;
+  preview?: 'ok' | 'failed';
+}
+
+/** meta_json of an audio attachment. */
+export interface AudioMeta {
+  recording?: 'recording' | 'done';
+  segment_count?: number;
+  mime?: string;
+  /** Homework items already turned into tasks: index → task id. */
+  created_tasks?: Record<string, string>;
+}
+
+export interface Bookmark {
+  at_sec: number;
+  label?: string | null;
+}
+
+export interface TranscriptSummary {
+  main_points: string[];
+  key_terms: { term: string; explanation: string }[];
+  homework: { title: string; deadline_hint: string | null }[];
+}
+
+export interface TranscriptLine {
+  t: number;
+  text: string;
+}
+
+export interface AudioSegment {
+  id: string;
+  attachment_id: string;
+  seq: number;
+  storage_path: string;
+  mime: string;
+  start_offset_sec: number;
+  duration_sec: number;
+  uploaded: boolean;
+  transcript_status: 'none' | 'pending' | 'processing' | 'done' | 'failed';
+  transcript_json: TranscriptLine[] | null;
+  last_error: string | null;
 }
 
 export interface WorkHoursRow {

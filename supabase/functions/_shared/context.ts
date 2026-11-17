@@ -4,6 +4,7 @@
  */
 import { createClient, type SupabaseClient, type User } from '@supabase/supabase-js';
 import { type AIProvider, GeminiProvider, GroqProvider } from './ai-provider.ts';
+import { WhisperTranscriber } from './transcribe-core.ts';
 
 export function env(name: string): string | undefined {
   const v = Deno.env.get(name);
@@ -50,11 +51,18 @@ export function aiProviders(): AIProvider[] {
   const list: AIProvider[] = [];
   const gKey = env('GEMINI_API_KEY');
   const gModel = env('GEMINI_MODEL');
-  if (gKey && gModel) list.push(new GeminiProvider(gKey, gModel));
+  if (gKey && gModel) list.push(new GeminiProvider(gKey, gModel, fetch, env('GEMINI_BASE_URL')));
   const qKey = env('GROQ_API_KEY');
   const qModel = env('GROQ_MODEL');
-  if (qKey && qModel) list.push(new GroqProvider(qKey, qModel));
+  if (qKey && qModel) list.push(new GroqProvider(qKey, qModel, fetch, env('GROQ_BASE_URL')));
   return list;
+}
+
+/** Groq Whisper speech-to-text, the transcription fallback (model id only from env). */
+export function speechToText(): WhisperTranscriber | null {
+  const key = env('GROQ_API_KEY');
+  const model = env('GROQ_STT_MODEL');
+  return key && model ? new WhisperTranscriber(key, model, fetch, env('GROQ_BASE_URL')) : null;
 }
 
 export function dailyAiLimit(): number {

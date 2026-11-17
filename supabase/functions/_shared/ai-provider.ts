@@ -57,10 +57,12 @@ export class GeminiProvider implements AIProvider {
     private readonly apiKey: string,
     readonly model: string,
     private readonly fetchFn: FetchFn = fetch,
+    /** Override for API gateways / regional proxies (GEMINI_BASE_URL). */
+    private readonly baseUrl = 'https://generativelanguage.googleapis.com',
   ) {}
 
   async generateJson(req: AIRequest, signal: AbortSignal): Promise<AIResponse> {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(this.model)}:generateContent`;
+    const url = `${this.baseUrl}/v1beta/models/${encodeURIComponent(this.model)}:generateContent`;
     const parts: unknown[] = [{ text: req.user }];
     if (req.audio) parts.push({ inline_data: { mime_type: req.audio.mimeType, data: req.audio.base64 } });
     const res = await this.fetchFn(url, {
@@ -96,11 +98,13 @@ export class GroqProvider implements AIProvider {
     private readonly apiKey: string,
     readonly model: string,
     private readonly fetchFn: FetchFn = fetch,
+    /** Override for API gateways (GROQ_BASE_URL). */
+    private readonly baseUrl = 'https://api.groq.com',
   ) {}
 
   async generateJson(req: AIRequest, signal: AbortSignal): Promise<AIResponse> {
     if (req.audio) throw new AIError('groq: audio not supported', null, false, this.name);
-    const res = await this.fetchFn('https://api.groq.com/openai/v1/chat/completions', {
+    const res = await this.fetchFn(`${this.baseUrl}/openai/v1/chat/completions`, {
       method: 'POST',
       signal,
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.apiKey}` },

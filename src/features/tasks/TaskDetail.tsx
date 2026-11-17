@@ -4,8 +4,8 @@
  * Existing tasks save field-by-field (optimistic, offline-queued).
  */
 import Ionicons from '@expo/vector-icons/Ionicons';
-import * as WebBrowser from 'expo-web-browser';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
+import { router } from 'expo-router';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
@@ -34,18 +34,24 @@ import {
   type TaskPatch,
   useCreateLinks,
   useCreateTasks,
+  useDeleteAttachment,
   useDeleteLink,
   useDeleteTask,
   useUpdateTask,
 } from '../../lib/api/mutations';
-import { useCollections, useLinks, useTaskBlocks, useTasks } from '../../lib/api/queries';
+import { useAttachments, useCollections, useLinks, useTaskBlocks, useTasks } from '../../lib/api/queries';
+import { useMediaActions } from '../media/actions';
+import { AudioCard } from '../media/AudioCard';
+import { ImageThumb } from '../media/ImageThumb';
+import { LinkCard } from '../media/LinkCard';
+import { ImageSourceSheet } from '../notes/NoteSheets';
 import type { Priority, Space, Task } from '../../lib/api/types';
 import { subtasksOf } from '../../lib/tasks/grouping';
-import { domainOf, extractUrlClient } from '../../lib/tasks/url';
+import { extractUrlClient } from '../../lib/tasks/url';
 import { formatDayHeader, formatDurationLong, formatTimeRange } from '../../lib/time/format';
 import { dateKeyOf } from '../../lib/time/tz';
 import { useTheme } from '../../theme/ThemeProvider';
-import { radius, spacing, touchTarget } from '../../theme/tokens';
+import { spacing, touchTarget } from '../../theme/tokens';
 import { type as typeScale } from '../../theme/typography';
 
 type Field = 'space' | 'collection' | 'deadline' | 'estimate' | 'priority';
@@ -473,20 +479,10 @@ function ExistingTask({ task, allTasks, onClose }: { task: Task; allTasks: Task[
 
       <Section title={vi.tasks.fields.links}>
         {links.map((l) => (
-          <View key={l.id} style={[styles.linkRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Pressable
-              accessibilityRole="link"
-              accessibilityLabel={l.url ?? ''}
-              style={styles.flex}
-              onPress={() => l.url && void WebBrowser.openBrowserAsync(l.url)}
-            >
-              <AppText variant="body" tone="heading" numberOfLines={1}>
-                {l.title ?? domainOf(l.url ?? '')}
-              </AppText>
-              <AppText variant="meta" tone="muted" numberOfLines={1}>
-                {domainOf(l.url ?? '')}
-              </AppText>
-            </Pressable>
+          <View key={l.id} style={styles.row}>
+            <View style={styles.flex}>
+              <LinkCard attachment={l} />
+            </View>
             <IconBtn icon="close" label={vi.common.delete} onPress={() => deleteLink.mutate(l.id)} />
           </View>
         ))}
@@ -504,6 +500,8 @@ function ExistingTask({ task, allTasks, onClose }: { task: Task; allTasks: Task[
           <Button label={vi.common.add} variant="secondary" onPress={addLink} disabled={!newLink.trim()} />
         </View>
       </Section>
+
+      <TaskMedia task={task} />
 
       <Section title={vi.tasks.fields.blocks}>
         {blocks.length === 0 ? (
@@ -595,15 +593,66 @@ const styles = StyleSheet.create({
   fieldRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', minHeight: touchTarget },
   editor: { paddingBottom: spacing.sm },
   subRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs },
-  linkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: radius.input,
-    paddingLeft: spacing.md,
-    minHeight: touchTarget + 8,
-  },
+  mediaGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  mediaCell: { width: '48%' },
   blockRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, minHeight: 32 },
   iconBtn: { width: touchTarget, height: touchTarget, alignItems: 'center', justifyContent: 'center' },
   strike: { textDecorationLine: 'line-through' },
 });
+
+/** Photos and recordings attached to a task. */
+function TaskMedia({ task }: { task: Task }) {
+  const owner = useMemo(() => ({ type: 'task' as const, id: task.id }), [task.id]);
+  const media = useMediaActions(owner);
+  const all = useAttachments(task.id).data ?? [];
+  const images = all.filter((a) => a.type === 'image');
+  const audio = all.filter((a) => a.type === 'audio');
+  const deleteAttachment = useDeleteAttachment(task.id);
+  const [picking, setPicking] = useState(false);
+  const remove = async (id: string) => {
+    if (await confirmDestructive(vi.common.confirmDelete)) deleteAttachment.mutate(id);
+  };
+  return (
+    <Section title={`${vi.media.images} & ${vi.media.recordings.toLowerCase()}`}>
+      {images.length > 0 && (
+        <View style={styles.mediaGrid}>
+          {images.map((a) => (
+            <View key={a.id} style={styles.mediaCell}>
+              <ImageThumb attachment={a} maxHeight={160} onLongPress={() => void remove(a.id)} />
+            </View>
+          ))}
+        </View>
+      )}
+      {audio.map((a) => (
+        <AudioCard
+          key={a.id}
+          attachment={a}
+          taskContext={{ space: task.space, collection_id: task.collection_id, source_note_id: task.source_note_id }}
+          onRemove={() => void remove(a.id)}
+        />
+      ))}
+      <View style={styles.row}>
+        <Button
+          label={vi.media.addPhoto}
+          variant="secondary"
+          icon={<Ionicons name="camera-outline" size={18} color="#F2F4F7" />}
+          onPress={() => setPicking(true)}
+        />
+        <Button
+          label={vi.media.addRecording}
+          variant="secondary"
+          icon={<Ionicons name="mic-outline" size={18} color="#F2F4F7" />}
+          onPress={() => router.push({ pathname: '/record', params: { task: task.id } })}
+        />
+      </View>
+      <ImageSourceSheet
+        visible={picking}
+        onClose={() => setPicking(false)}
+        onPick={(src) => {
+          setPicking(false);
+          void media.addImages(src);
+        }}
+      />
+    </Section>
+  );
+}

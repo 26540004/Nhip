@@ -6,8 +6,10 @@
 import * as Crypto from 'expo-crypto';
 import { addDaysToKey, APP_TZ, dateKeyOf, localToInstant, weekdayOfKey } from '../../time/tz';
 import { DEMO_UID, type Row, type Tables } from './demoDb';
+import { DEMO_DURATION_SEC, DEMO_SUMMARY, demoSegments, demoTranscriptText, lectureDoc } from './seedMedia';
 
 const id = () => Crypto.randomUUID();
+
 const iso = (t: number) => new Date(t).toISOString();
 
 export function seedDemo(now: number = Date.now()): Tables {
@@ -185,30 +187,80 @@ export function seedDemo(now: number = Date.now()): Tables {
     return nid;
   };
   const notes: Row[] = [];
-  const n1 = note(
-    'Bài giảng TCP/IP – tuần 5',
-    'Bắt tay ba bước: SYN → SYN-ACK → ACK\nCửa sổ trượt giúp kiểm soát luồng\n[ ] Làm bài tập 3 trang 112\n[x] Đọc slide tuần 5\n[ ] Hỏi thầy về bài lab định tuyến',
-    'study',
-    mang,
-    true,
-  );
+  // The lecture note shows Phase 5: rich text, a whiteboard photo, a link card and a
+  // transcribed recording with its summary.
+  const n1 = id();
+  const imageId = id();
+  const linkId = id();
+  const audioId = id();
+  const lecture = lectureDoc({ image: imageId, link: linkId, audio: audioId });
+  notes.push({
+    ...base,
+    id: n1,
+    space: 'study',
+    collection_id: mang,
+    title: 'Bài giảng TCP/IP – tuần 5',
+    plain_text: lecture.plain,
+    content_json: lecture.doc,
+    pinned: true,
+  });
   note('Ý tưởng banner', 'Màu chủ đạo xanh lá, thêm ảnh sản phẩm mới, CTA "Đặt hàng ngay".\n[ ] Gửi 2 phương án cho anh Minh', 'work', web);
   note('Ôn CSDL', 'Chuẩn hóa 1NF → 3NF, khóa ngoại, JOIN các loại.\n[ ] Làm lại đề năm ngoái', 'study', csdl);
   note('Việc cá nhân', 'Gia hạn thẻ thư viện\nĐặt lịch khám răng', 'work', null);
 
+  const segs = demoSegments();
   const attachments: Row[] = [
     {
       ...base,
-      id: id(),
+      id: linkId,
       owner_type: 'note',
       owner_id: n1,
       type: 'link',
       url: 'https://www.rfc-editor.org/rfc/rfc9293',
-      title: 'RFC 9293 – TCP',
+      title: 'RFC 9293: Transmission Control Protocol (TCP)',
       storage_path: null,
-      meta_json: {},
+      meta_json: { description: 'Đặc tả chuẩn của TCP (2022), thay thế RFC 793.', image: null, site_name: 'RFC Editor', preview: 'ok' },
+    },
+    {
+      ...base,
+      id: imageId,
+      owner_type: 'note',
+      owner_id: n1,
+      type: 'image',
+      storage_path: `${DEMO_UID}/demo-whiteboard.svg`,
+      meta_json: { width: 960, height: 600, thumb_path: `${DEMO_UID}/demo-whiteboard.svg` },
+    },
+    {
+      ...base,
+      id: audioId,
+      owner_type: 'note',
+      owner_id: n1,
+      type: 'audio',
+      title: 'Ghi âm buổi học tuần 5',
+      storage_path: `${DEMO_UID}/${audioId}/seg-000.m4a`,
+      duration_sec: DEMO_DURATION_SEC,
+      bookmarks_json: [{ at_sec: 72 }, { at_sec: 1210 }, { at_sec: 2380 }],
+      meta_json: { recording: 'done', segment_count: segs.length, mime: 'audio/mp4' },
+      transcript_status: 'done',
+      transcript_text: demoTranscriptText(),
+      summary_json: DEMO_SUMMARY,
     },
   ];
+  const audio_segments: Row[] = segs.map((sg) => ({
+    ...base,
+    id: id(),
+    attachment_id: audioId,
+    seq: sg.seq,
+    storage_path: `${DEMO_UID}/${audioId}/seg-${String(sg.seq).padStart(3, '0')}.m4a`,
+    mime: 'audio/mp4',
+    start_offset_sec: sg.start,
+    duration_sec: sg.duration,
+    uploaded: true,
+    transcript_status: 'done',
+    transcript_json: sg.lines,
+    last_error: null,
+    attempts: 1,
+  }));
 
   // Google events (read-only) so the timeline/calendar show grey busy blocks.
   const busy_cache: Row[] = [
@@ -284,6 +336,7 @@ export function seedDemo(now: number = Date.now()): Tables {
     task_blocks,
     notes,
     attachments,
+    audio_segments,
     busy_cache,
     ai_proposals: [],
     google_connections: [],

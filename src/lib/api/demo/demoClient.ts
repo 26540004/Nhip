@@ -18,6 +18,7 @@ import { vi } from '../../../i18n/vi';
 import { rulesFromSettings } from '../../settings/rules';
 import type { SettingsBundle } from '../queries';
 import { DEMO_UID, DemoDb, query, type Row } from './demoDb';
+import { demoLinkPreview, demoNoteAi, demoStorage, demoTranscribe } from './demoMedia';
 import { demoParse } from './demoParse';
 import { seedDemo } from './seed';
 
@@ -163,6 +164,7 @@ function searchLocal(q: string): Row[] {
 export function createDemoClient() {
   return {
     from: (table: string) => query(demoDb, table),
+    storage: demoStorage,
     rpc: async (fn: string, args: Record<string, unknown>) => {
       if (fn === 'search_all') return { data: searchLocal(String(args.q ?? '')), error: null };
       return { data: null, error: { message: `rpc ${fn} not available in demo` } };
@@ -181,6 +183,14 @@ export function createDemoClient() {
           return { data: demoParse(text, cols, Date.now(), 'Asia/Ho_Chi_Minh'), error: null };
         }
         if (name === 'propose-plan') return proposePlanLocal(opts.body);
+        if (name === 'link-preview') {
+          const p = demoLinkPreview(String(opts.body?.url ?? ''));
+          return p ? { data: p, error: null } : fnError('link_blocked', 422);
+        }
+        if (name === 'transcribe-audio' || name === 'note-ai') {
+          const r = name === 'note-ai' ? demoNoteAi(demoDb, opts.body ?? {}, Date.now()) : demoTranscribe(demoDb, opts.body ?? {});
+          return r.error ? fnError(r.error, r.status) : { data: r.data, error: null };
+        }
         if (name.startsWith('gcal-')) return fnError('demo_unavailable', 409);
         return fnError('internal', 404);
       },

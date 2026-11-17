@@ -109,6 +109,7 @@ export function NotesScreen() {
         <View style={styles.inline}>
           {pending > 0 && <Chip label={`${vi.states.pendingSync} · ${pending}`} icon="cloud-upload-outline" tone="warning" />}
           <HeaderIconButton icon="search" label={vi.search.placeholder} onPress={() => router.push('/search')} />
+          <HeaderIconButton icon="mic-outline" label={vi.notes.record} onPress={() => router.push('/record')} />
           <HeaderIconButton icon="create-outline" label={vi.notes.newNote} onPress={createNote} />
         </View>
       </View>

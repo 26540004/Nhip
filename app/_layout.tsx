@@ -9,6 +9,8 @@ import { DarkTheme, SplashScreen, Stack, ThemeProvider as NavThemeProvider } fro
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { RecorderHost } from '../src/features/record/RecorderHost';
+import { useUploadWorker } from '../src/lib/media/useUploadWorker';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ConfirmHost } from '../src/components/ConfirmHost';
 import { ToastHost } from '../src/components/Toast';
@@ -68,7 +70,12 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <PersistQueryClientProvider
           client={queryClient}
-          persistOptions={{ persister: queryPersister, buster: QUERY_CACHE_BUSTER }}
+          persistOptions={{
+            persister: queryPersister,
+            buster: QUERY_CACHE_BUSTER,
+            // Signed storage URLs expire; never restore them from disk.
+            dehydrateOptions: { shouldDehydrateQuery: (q) => q.state.status === 'success' && q.meta?.persist !== false },
+          }}
           // Replay writes made offline (or before the app was closed).
           onSuccess={() => void queryClient.resumePausedMutations().then(() => queryClient.invalidateQueries())}
         >
@@ -91,10 +98,13 @@ export default function RootLayout() {
                   <Stack.Screen name="brief" />
                   <Stack.Screen name="review" />
                   <Stack.Screen name="settings/reminders" />
+                  <Stack.Screen name="record" options={{ gestureEnabled: false }} />
+                  <Stack.Screen name="viewer" options={{ presentation: 'fullScreenModal', animation: 'fade' }} />
                 </Stack.Protected>
               </Stack>
               {signedIn && <QuickAddSheet />}
               {signedIn && <AutoSync />}
+              {signedIn && <RecorderHost />}
               <ConfirmHost />
               <ToastHost />
             </NavThemeProvider>
@@ -109,5 +119,6 @@ export default function RootLayout() {
 function AutoSync() {
   useAutoSync(true);
   useNotifications();
+  useUploadWorker(true);
   return null;
 }

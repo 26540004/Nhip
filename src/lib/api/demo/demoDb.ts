@@ -12,7 +12,7 @@ export type Row = Record<string, unknown>;
 export type Tables = Record<string, Row[]>;
 
 export const DEMO_UID = '00000000-0000-4000-8000-00000000d3e0';
-const STORAGE_KEY = 'nhip-demo-db-v1';
+const STORAGE_KEY = 'nhip-demo-db-v2';
 
 const WITH_UPDATED_AT = new Set([
   'tasks',
@@ -20,6 +20,7 @@ const WITH_UPDATED_AT = new Set([
   'collections',
   'task_blocks',
   'attachments',
+  'audio_segments',
   'profiles',
   'reminder_settings',
   'google_connections',
@@ -80,10 +81,20 @@ export class DemoDb {
         this.tables.tasks = this.table('tasks').filter((t) => !ids.has(t.id));
       }
       this.tables.task_blocks = this.table('task_blocks').filter((b) => !ids.has(b.task_id));
-      this.tables.attachments = this.table('attachments').filter((a) => !(a.owner_type === 'task' && ids.has(a.owner_id)));
+      this.dropAttachments((a) => a.owner_type === 'task' && ids.has(a.owner_id));
     }
-    if (table === 'notes')
-      this.tables.attachments = this.table('attachments').filter((a) => !(a.owner_type === 'note' && ids.has(a.owner_id)));
+    if (table === 'notes') this.dropAttachments((a) => a.owner_type === 'note' && ids.has(a.owner_id));
+    if (table === 'attachments') this.tables.audio_segments = this.table('audio_segments').filter((s) => !ids.has(s.attachment_id));
+  }
+
+  private dropAttachments(match: (a: Row) => boolean): void {
+    const gone = new Set(
+      this.table('attachments')
+        .filter(match)
+        .map((a) => a.id),
+    );
+    this.tables.attachments = this.table('attachments').filter((a) => !gone.has(a.id));
+    this.tables.audio_segments = this.table('audio_segments').filter((s) => !gone.has(s.attachment_id));
   }
 }
 
@@ -127,6 +138,7 @@ const TABLE_DEFAULTS: Record<string, Row> = {
     summary_json: null,
   },
   ai_proposals: { status: 'pending', response_json: null, validation_report_json: null, provider: null, model: null },
+  audio_segments: { mime: 'audio/mp4', uploaded: false, transcript_status: 'none', transcript_json: null, attempts: 0, last_error: null },
 };
 
 // ---------------------------------------------------------------------------
