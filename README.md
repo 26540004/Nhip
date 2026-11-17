@@ -18,9 +18,8 @@ Ba vấn đề cốt lõi: dồn quá nhiều việc vào một ngày → giới
 | **3. Lịch & AI xếp lịch** | `gcal-auth` (OAuth, Vault, lịch riêng "Nhịp"), `gcal-sync` (2 chiều, syncToken, 410, thu hồi quyền), `propose-plan` (AI đề xuất → code kiểm tra/sửa/bổ sung, dự phòng không AI, Cân bằng lại, Xếp lịch việc này), màn duyệt đề xuất + Hoàn tác 10 s, màn Lịch Ngày/3 ngày/Tuần với kéo thả và "Đổi giờ", cài đặt Google | ✅ Xong |
 | **4. Nhắc nhở** | Nhắc trước giờ bắt đầu khối (thông báo cục bộ, tối đa 50, nút "Bắt đầu" / "Hoãn 15 phút"), đăng ký push token, `push-dispatch` (tóm tắt sáng, tổng kết tối, nhắc hạn chót, giờ yên lặng, chống gửi trùng), màn `/brief`, `/review`, thẻ tóm tắt trên Hôm nay, Cài đặt → Nhắc nhở | ✅ Xong |
 | **5. Ghi âm & Ghi chú giàu nội dung** | Trình soạn thảo khối (tiêu đề, đậm/nghiêng, danh sách, checklist → việc), ảnh (nén 1920 px, thumbnail, xem phóng to), thẻ liên kết (`link-preview`, chống SSRF), ghi âm nền chia đoạn 10 phút + tải lên nền + phát lại có đánh dấu, `transcribe-audio` (từng đoạn, thử lại, tóm tắt, bài tập → việc), `note-ai` (tóm tắt ghi chú, tìm việc), ảnh & ghi âm trong chi tiết việc | ✅ Xong |
-| 6. Hoàn thiện | Onboarding, Cài đặt đầy đủ, seed, xuất dữ liệu, QA trên iPhone thật | ⏳ |
+| **6. Hoàn thiện** | Onboarding 5 bước, Cài đặt đầy đủ (giờ hành chính, thời khóa biểu + ngoại lệ, khung giờ học, sức chứa, dữ liệu), xuất dữ liệu .zip, "✦ Chia nhỏ việc này" (`split-task`), script seed, icon riêng, rà soát giao diện/trợ năng/ngoại tuyến, QA lập lịch trên dữ liệu seed | ✅ Xong (còn QA trên iPhone thật — xem mục "Đã kiểm chứng") |
 
-Các màn hình chưa tới giai đoạn của mình hiển thị trạng thái "Đang xây dựng" — không có nút giả.
 
 ---
 
@@ -74,6 +73,68 @@ Lõi lập lịch nằm ở `supabase/functions/_shared/planning/` và được 
 - Deploy: `npx supabase functions deploy push-dispatch` (cron gọi bằng service key; hàm từ chối mọi lời gọi khác).
 
 
+
+## Bắt đầu (onboarding)
+
+Lần đầu đăng nhập, Nhịp đưa bạn qua tối đa 5 bước (bước có thể bỏ qua được ghi rõ):
+1. Đăng nhập (Apple / Google).
+2. Kết nối Google Calendar — giải thích vì sao cần và cách vượt cảnh báo "Google chưa xác minh ứng dụng này" (*có thể bỏ qua*).
+3. Giờ hành chính — mặc định T2–T6 08:00–17:00, nghỉ trưa 12:00–13:00.
+4. Thời khóa biểu — thêm nhanh: chọn môn (hoặc gõ môn mới) → thứ → giờ (*có thể bỏ qua*).
+5. Thông báo — xin quyền ngay tại chỗ, kèm giải thích (*có thể bỏ qua*).
+
+Xong thì về **Hôm nay**, kèm ghi chú ghim "Hướng dẫn nhanh". Xem lại bất cứ lúc nào: Cài đặt → *Xem lại hướng dẫn bắt đầu*.
+
+## Cài đặt
+
+| Mục | Nội dung |
+|---|---|
+| Google Calendar | kết nối/ngắt, lịch để đọc giờ bận, lịch "Nhịp", đồng bộ ngay |
+| Giờ hành chính | giờ làm + nghỉ trưa từng ngày, "Áp dụng giờ thứ Hai cho T3–T6"; giờ sai được báo ngay, không lưu |
+| Thời khóa biểu | buổi học hằng tuần theo môn (phòng học, cảnh báo trùng giờ) + ngoại lệ theo ngày: **Nghỉ**, **Dời buổi**, **Học bù** |
+| Khung giờ học | các khung được xếp việc Học (có thể qua nửa đêm), sao chép sang các ngày khác |
+| Sức chứa mỗi ngày | phút tập trung tối đa cho Học / Việc từng ngày (bước 30 phút) |
+| Nhắc nhở | tóm tắt sáng, tổng kết tối, nhắc trước khối, nhắc hạn chót, giờ yên lặng |
+| Môn học & dự án | thêm, đổi tên, lưu trữ |
+| AI | chế độ riêng tư, nhà cung cấp (Gemini → Groq → quy tắc), lượt AI hôm nay |
+| Dữ liệu | **Xuất dữ liệu (.zip)**, xóa bộ nhớ đệm trên máy, đăng xuất |
+
+Mọi thay đổi lưu ngay (đi qua hàng đợi ghi offline) và lần đề xuất lịch kế tiếp dùng luôn.
+
+### Xuất dữ liệu
+Tệp `nhip-du-lieu-YYYYMMDD-HHmm.zip` (trên iPhone mở bảng chia sẻ, trên web tải xuống) gồm:
+- `nhip-du-lieu.json` — mọi bảng của bạn (việc, khối lịch, ghi chú, đính kèm, thời khóa biểu, cài đặt…). **Không** gồm mã truy cập Google, token thông báo, bộ đệm sự kiện Google.
+- `ghi-chu/<ngày>-<tên>.md` — mỗi ghi chú một tệp Markdown (tiêu đề, danh sách, checklist, liên kết, ảnh) kèm tóm tắt và bản chép lời ghi âm.
+- `ghi-am-va-anh.md` — danh sách bản ghi âm (từng đoạn) và ảnh, có đường tải xuống hạn 7 ngày.
+- `Đọc trước.md` — mô tả nội dung.
+
+## ✦ Chia nhỏ việc này
+
+Trong chi tiết việc: AI (`split-task`) đề xuất 2–7 bước cụ thể. Code dọn kết quả: bỏ bước trùng (kể cả trùng việc con đã có), mỗi bước 10–90 phút (bội số 5), và nếu việc có ước tính thì co giãn cho khớp phần chưa có việc con. Bạn sửa tên, đổi thời lượng, bỏ bước rồi bấm **Tạo n việc con** (nguồn `ai_split`). Chế độ riêng tư: AI chỉ nhận tiêu đề, thời lượng, hạn chót — không nhận mô tả.
+
+## Dữ liệu mẫu (seed)
+
+```bash
+# Đăng nhập app một lần để tạo tài khoản, rồi trên máy của bạn:
+SUPABASE_URL=https://<project-ref>.supabase.co SUPABASE_SERVICE_ROLE_KEY=<service-role-key> \
+  node scripts/seed/seed.mjs --email ban@example.com          # thêm --wipe để xóa dữ liệu cũ của tài khoản đó
+```
+Tạo: 2 môn học (Mạng máy tính, Cơ sở dữ liệu), 2 dự án (Website An Phát, Báo cáo quý IV), thời khóa biểu 4 buổi/tuần + 1 buổi nghỉ + 1 buổi học bù, giờ hành chính T2–T6 08:00–17:00 (nghỉ 12:00–13:00), khung giờ học, sức chứa, 15 việc với hạn đa dạng (2 quá hạn, hôm nay, ngày mai, tuần này, tuần sau, không hạn; 1 việc 6 giờ hạn sáng mai để thấy cảnh báo "không kịp"), 4 việc con, 5 ghi chú có đính kèm (liên kết + 2 ảnh tải lên Storage). Service role key chỉ dùng trên máy bạn, không bao giờ đưa vào app.
+
+## Đã kiểm chứng (QA)
+
+Tự động, chạy lại được:
+- **Jest**: ngày giờ tiếng Việt, khung trống, sức chứa, `validatePlan`/`greedyPlan`, lập lịch thông báo (giới hạn 64), mô hình ghi chú, link preview + SSRF, phiên âm, hàng đợi tải lên, cài đặt giờ giấc, xuất dữ liệu, chia nhỏ việc.
+- **Postgres thật** (`scripts/db-check`): migrations + RLS, tìm kiếm không dấu, giới hạn lượt AI, Vault.
+- **Đầu-cuối trên dữ liệu seed** (PostgREST + Edge Functions thật, AI giả lập):
+  - AI cố tình đề xuất 40 khối sai (Việc lúc 20:00 và giờ nghỉ trưa, Học trùng giờ lên lớp/giờ hành chính, khối 3,5 giờ) → sau khi code kiểm tra: **0 khối Việc ngoài giờ hành chính hay trong giờ nghỉ trưa, 0 khối Học trùng giờ học hoặc giờ hành chính**, không chồng lấn, đệm ≥ 10 phút, không khối nào sau hạn chót.
+  - Việc 6 giờ hạn 10:00 sáng mai → cảnh báo rõ "không đủ thời gian", không âm thầm bỏ.
+  - Gemini trả 429 → Quick Add tự chuyển sang Groq, người dùng không thấy lỗi.
+  - Chế độ riêng tư bật → không request nào tới AI chứa nội dung ghi chú hay mô tả việc; tóm tắt ghi chú/phiên âm bị từ chối.
+- **Giao diện**: mọi màn hình ở 320/375/440 pt và 1280 px — không lỗi console, không tràn ngang, mọi nút có nhãn trợ năng; trạng thái ngoại tuyến hiển thị đúng.
+
+Cần làm trên **iPhone thật** (không giả lập được ở đây): ghi âm 90 phút khi khóa màn hình + cuộc gọi chen ngang, push sáng/tối/hạn chót đúng giờ, ≤ 64 thông báo chờ, Google Calendar thật (duyệt → hiện trong lịch "Nhịp", dời/xóa trên Google → app cập nhật, Hoàn tác xóa sự kiện).
+
 ## Ghi chú giàu nội dung
 
 - **Trình soạn thảo** viết bằng component gốc (không WebView), chạy giống nhau trên iPhone và web. Nội dung lưu dạng JSON trong `notes.content_json`: danh sách khối `h1`, `h2`, `p`, `bullet`, `number`, `check`, `image`, `link`, `audio` (`src/lib/notes/doc.ts`, có test). Đậm/nghiêng là `**…**` / `_…_` trong khối chữ: khi không gõ, khối hiện chữ đã định dạng; chạm vào để sửa. `Ctrl/⌘+B`, `Ctrl/⌘+I` trên web.
@@ -121,7 +182,7 @@ app/                      Expo Router (routes)
 src/
   components/             AppText, Button, Card, CapacityBar, DayTimeline, Sheet, SpaceFilterControl, EmptyState, AppTabBar
   features/               today, quick-add, notes (trình soạn thảo), media (ảnh, link, ghi âm, phát lại),
-                          record (bộ ghi nền), … (mỗi tính năng một thư mục)
+                          record (bộ ghi nền), settings, onboarding, … (mỗi tính năng một thư mục)
   hooks/                  useResponsive, useKeyboardShortcuts, useNow
   lib/
     time/                 tz.ts, intervals.ts, slots.ts, format.ts
@@ -129,6 +190,8 @@ src/
     notifications/        local.ts (bộ lập lịch giới hạn 64 của iOS)
     notes/                doc.ts (mô hình nội dung ghi chú)
     media/                hàng đợi tải lên, ảnh, tệp trên máy, tiện ích ghi âm
+    settings/             kiểm tra & tóm tắt giờ giấc (hours.ts), rulesFromSettings
+    export/               dựng & nén tệp xuất dữ liệu
     api/                  supabase.ts, queryClient.ts
   stores/                 ui.ts (Zustand)
   theme/                  tokens.ts, typography.ts, ThemeProvider.tsx
@@ -139,8 +202,9 @@ supabase/
   functions/
     _shared/              ai-provider (Gemini/Groq + fallback), vi-parse, parse-task-core, planning/, google, brief-core,
                           link-preview-core, transcribe-core, note-ai-core, http, context
-    parse-task/ propose-plan/ gcal-auth/ gcal-sync/ push-dispatch/ link-preview/ transcribe-audio/ note-ai/
+    parse-task/ propose-plan/ gcal-auth/ gcal-sync/ push-dispatch/ link-preview/ transcribe-audio/ note-ai/ split-task/
 scripts/db-check/         chạy migrations trên Postgres tạm + kiểm tra RLS
+scripts/seed/seed.mjs     dữ liệu mẫu cho một tài khoản
 ```
 
 ### Quy ước thời gian
@@ -218,6 +282,7 @@ cd scripts/db-check && npm install && npm run check   # migrations + RLS trên P
    npx supabase functions deploy link-preview
    npx supabase functions deploy transcribe-audio
    npx supabase functions deploy note-ai
+   npx supabase functions deploy split-task
    ```
    Lấy key Gemini miễn phí tại aistudio.google.com, key Groq tại console.groq.com. Đặt `GEMINI_MODEL` là model Flash miễn phí mới nhất đang có trong AI Studio (cần nhận âm thanh); `GROQ_MODEL` là một model chat hỗ trợ JSON mode; `GROQ_STT_MODEL` là model Whisper của Groq (dự phòng phiên âm, bỏ trống = không dự phòng).
 

@@ -227,6 +227,7 @@ function opPred(col: string, op: string, val: string): Pred {
 export class Query implements PromiseLike<Result> {
   private op: 'select' | 'insert' | 'update' | 'upsert' | 'delete' = 'select';
   private returning = false;
+  private conflict: string[] | null = null;
   private filters: Pred[] = [];
   private orders: { col: string; asc: boolean; nullsFirst: boolean }[] = [];
   private limitN: number | null = null;
@@ -253,9 +254,15 @@ export class Query implements PromiseLike<Result> {
     this.payload = rows;
     return this;
   }
-  upsert(rows: Row | Row[]): this {
+  upsert(rows: Row | Row[], opts?: { onConflict?: string }): this {
     this.op = 'upsert';
     this.payload = rows;
+    this.conflict = opts?.onConflict
+      ? opts.onConflict
+          .split(',')
+          .map((c) => c.trim())
+          .filter((c) => c !== 'user_id')
+      : null;
     return this;
   }
   update(patch: Row): this {
@@ -375,7 +382,15 @@ export class Query implements PromiseLike<Result> {
       const list = (Array.isArray(this.payload) ? this.payload : [this.payload!]) as Row[];
       const done: Row[] = [];
       for (const r of list) {
-        const existing = this.op === 'upsert' && r.id != null ? this.db.table(t).find((x) => x.id === r.id) : undefined;
+        const conflict = this.conflict;
+        const existing =
+          this.op !== 'upsert'
+            ? undefined
+            : conflict
+              ? this.db.table(t).find((x) => conflict.every((c) => x[c] === r[c]))
+              : r.id != null
+                ? this.db.table(t).find((x) => x.id === r.id)
+                : undefined;
         if (existing) {
           Object.assign(existing, r, WITH_UPDATED_AT.has(t) ? { updated_at: new Date().toISOString() } : {});
           done.push(existing);

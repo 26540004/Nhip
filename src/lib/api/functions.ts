@@ -136,3 +136,12 @@ export function noteSummarize(noteId: string): Promise<{ summary: TranscriptSumm
 export function noteExtractTasks(noteId: string): Promise<{ tasks: ParsedTask[]; provider: string }> {
   return invoke('note-ai', { note_id: noteId, action: 'extract_tasks' });
 }
+
+export interface SplitStepDto {
+  title: string;
+  estimate_minutes: number;
+}
+
+export function splitTask(taskId: string): Promise<{ steps: SplitStepDto[]; provider: string }> {
+  return invoke('split-task', { task_id: taskId });
+}

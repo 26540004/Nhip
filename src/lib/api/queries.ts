@@ -140,7 +140,7 @@ export async function fetchSettings(): Promise<SettingsBundle> {
     db.from('work_hours').select('weekday, start_time, end_time, break_start, break_end, enabled').order('weekday'),
     db.from('study_windows').select('id, weekday, start_time, end_time').order('weekday'),
     db.from('class_sessions').select('id, collection_id, weekday, start_time, end_time, location, valid_from, valid_to'),
-    db.from('schedule_exceptions').select('id, class_session_id, date, type, new_start_at, new_end_at'),
+    db.from('schedule_exceptions').select('id, class_session_id, date, type, new_start_at, new_end_at, note'),
     db.from('capacity_settings').select('space, weekday, max_focus_minutes'),
     db
       .from('reminder_settings')
@@ -160,8 +160,8 @@ export async function fetchSettings(): Promise<SettingsBundle> {
   };
 }
 
-export function useSettings() {
-  return useQuery({ queryKey: qk.settings, queryFn: fetchSettings, staleTime: 5 * 60_000 });
+export function useSettings(opts: { enabled?: boolean } = {}) {
+  return useQuery({ queryKey: qk.settings, queryFn: fetchSettings, staleTime: 5 * 60_000, enabled: opts.enabled ?? true });
 }
 
 /** Accepted / synced / conflict blocks overlapping [from, to). */

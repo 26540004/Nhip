@@ -22,7 +22,7 @@ import { vi } from '../../src/i18n/vi';
 import { confirmDestructive } from '../../src/lib/confirm';
 import { gcalCalendars, gcalDisconnect, gcalStart } from '../../src/lib/api/functions';
 import { qk } from '../../src/lib/api/queries';
-import { currentUserId, requireSupabase, unwrap } from '../../src/lib/api/supabase';
+import { currentUserId, isDemo, requireSupabase, unwrap } from '../../src/lib/api/supabase';
 import { formatDayHeader } from '../../src/lib/time/format';
 import { dateKeyOf, hhmmOf } from '../../src/lib/time/tz';
 import { useTheme } from '../../src/theme/ThemeProvider';
@@ -111,7 +111,11 @@ export default function GoogleSettings() {
         <AppText variant="secondary" tone="muted">
           {vi.google.why}
         </AppText>
-        {!connected || needsReconnect ? (
+        {isDemo ? (
+          <AppText variant="body" tone="muted">
+            {vi.onboarding.google.demo}
+          </AppText>
+        ) : !connected || needsReconnect ? (
           <>
             {needsReconnect && (
               <AppText variant="secondary" tone="danger">

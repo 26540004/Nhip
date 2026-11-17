@@ -5,6 +5,7 @@
  *  - transcribe-audio: walks through the segments like the server would, with sample text
  *  - note-ai: summary / task suggestions from the note's own structure (no AI)
  */
+import { normalizeSplit } from '../../../../supabase/functions/_shared/split-task-core.ts';
 import { vi } from '../../../i18n/vi';
 import { docToPlainText, normalizeDoc } from '../../notes/doc';
 import type { ParseTaskResponse, TranscriptSummary } from '../types';
@@ -210,3 +211,26 @@ export function demoNoteAi(db: DemoDb, body: Record<string, unknown>, now: numbe
 }
 
 export const isDemoUser = (r: Row) => r.user_id === DEMO_UID;
+
+// ---------------------------------------------------------------------------
+// split-task (rule-based steps, then the same clean-up as the real function)
+// ---------------------------------------------------------------------------
+
+export function demoSplit(db: DemoDb, body: Record<string, unknown>) {
+  const task = db.table('tasks').find((t) => t.id === body.task_id);
+  if (!task) return { status: 404, error: 'not_found' as const };
+  const title = String(task.title);
+  const study = task.space === 'study';
+  const base = study
+    ? ['Đọc lại slide và tài liệu liên quan', 'Lập dàn ý và chia phần', `Làm phần chính: ${title}`, 'Rà soát, sửa lỗi và hoàn thiện']
+    : ['Làm rõ yêu cầu và đầu ra cần có', 'Chuẩn bị tài liệu, số liệu', `Thực hiện: ${title}`, 'Kiểm tra lại và gửi đi'];
+  const existing = db
+    .table('tasks')
+    .filter((t) => t.parent_task_id === task.id)
+    .map((t) => ({ title: String(t.title), estimate_minutes: (t.estimate_minutes as number | null) ?? null }));
+  const steps = normalizeSplit(
+    { steps: base.map((t, i) => ({ title: t, estimate_minutes: [20, 20, 60, 25][i] ?? 30 })) },
+    { title, estimate_minutes: (task.estimate_minutes as number | null) ?? null, existing_subtasks: existing },
+  );
+  return { status: 200, data: { steps, provider: 'demo' } };
+}

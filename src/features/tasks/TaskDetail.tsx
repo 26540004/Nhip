@@ -23,6 +23,7 @@ import { errorMessage } from '../../components/QueryState';
 import { TextField } from '../../components/TextField';
 import { showToast } from '../../components/Toast';
 import { useNow } from '../../hooks/useNow';
+import { useOnline } from '../../hooks/useOnline';
 import { useStartPlan } from '../plan/useStartPlan';
 import { vi } from '../../i18n/vi';
 import { confirmDestructive } from '../../lib/confirm';
@@ -39,12 +40,13 @@ import {
   useDeleteTask,
   useUpdateTask,
 } from '../../lib/api/mutations';
-import { useAttachments, useCollections, useLinks, useTaskBlocks, useTasks } from '../../lib/api/queries';
+import { useAttachments, useCollections, useLinks, useSettings, useTaskBlocks, useTasks } from '../../lib/api/queries';
 import { useMediaActions } from '../media/actions';
 import { AudioCard } from '../media/AudioCard';
 import { ImageThumb } from '../media/ImageThumb';
 import { LinkCard } from '../media/LinkCard';
 import { ImageSourceSheet } from '../notes/NoteSheets';
+import { SplitTaskSheet } from './SplitTaskSheet';
 import type { Priority, Space, Task } from '../../lib/api/types';
 import { subtasksOf } from '../../lib/tasks/grouping';
 import { extractUrlClient } from '../../lib/tasks/url';
@@ -258,6 +260,8 @@ function ExistingTask({ task, allTasks, onClose }: { task: Task; allTasks: Task[
   const deleteLink = useDeleteLink(task.id);
   const { open, toggle } = useFieldToggle();
   const plan = useStartPlan();
+  const online = useOnline();
+  const privacy = Boolean(useSettings().data?.profile?.ai_privacy_mode);
 
   const [title, setTitle] = useState(task.title);
   const [description, setDescription] = useState(task.description ?? '');
@@ -265,6 +269,7 @@ function ExistingTask({ task, allTasks, onClose }: { task: Task; allTasks: Task[
   const [newLink, setNewLink] = useState('');
   const [actual, setActual] = useState(task.actual_minutes ? String(task.actual_minutes) : '');
   const [reparsing, setReparsing] = useState(false);
+  const [splitting, setSplitting] = useState(false);
 
   const patch = (p: TaskPatch) => update.mutate({ id: task.id, patch: p });
   const subtasks = subtasksOf(allTasks, task.id);
@@ -475,7 +480,15 @@ function ExistingTask({ task, allTasks, onClose }: { task: Task; allTasks: Task[
           </View>
           <Button label={vi.common.add} variant="secondary" onPress={addSubtask} disabled={!newSub.trim()} />
         </View>
+        <Button
+          label={vi.split.action}
+          variant="ai"
+          disabled={!online || done}
+          onPress={() => setSplitting(true)}
+          accessibilityHint={!online ? vi.errors.offline : undefined}
+        />
       </Section>
+      <SplitTaskSheet task={task} existing={subtasks.length} privacy={privacy} visible={splitting} onClose={() => setSplitting(false)} />
 
       <Section title={vi.tasks.fields.links}>
         {links.map((l) => (

@@ -18,7 +18,7 @@ import { vi } from '../../../i18n/vi';
 import { rulesFromSettings } from '../../settings/rules';
 import type { SettingsBundle } from '../queries';
 import { DEMO_UID, DemoDb, query, type Row } from './demoDb';
-import { demoLinkPreview, demoNoteAi, demoStorage, demoTranscribe } from './demoMedia';
+import { demoLinkPreview, demoNoteAi, demoSplit, demoStorage, demoTranscribe } from './demoMedia';
 import { demoParse } from './demoParse';
 import { seedDemo } from './seed';
 
@@ -187,8 +187,14 @@ export function createDemoClient() {
           const p = demoLinkPreview(String(opts.body?.url ?? ''));
           return p ? { data: p, error: null } : fnError('link_blocked', 422);
         }
-        if (name === 'transcribe-audio' || name === 'note-ai') {
-          const r = name === 'note-ai' ? demoNoteAi(demoDb, opts.body ?? {}, Date.now()) : demoTranscribe(demoDb, opts.body ?? {});
+        if (name === 'transcribe-audio' || name === 'note-ai' || name === 'split-task') {
+          const body = opts.body ?? {};
+          const r =
+            name === 'note-ai'
+              ? demoNoteAi(demoDb, body, Date.now())
+              : name === 'split-task'
+                ? demoSplit(demoDb, body)
+                : demoTranscribe(demoDb, body);
           return r.error ? fnError(r.error, r.status) : { data: r.data, error: null };
         }
         if (name.startsWith('gcal-')) return fnError('demo_unavailable', 409);

@@ -10,7 +10,18 @@ import { type QueryClient, useMutation, useMutationState, useQueryClient } from 
 import * as Crypto from 'expo-crypto';
 import { qk, type NoteListItem, type SettingsBundle } from './queries';
 import { requireSupabase, unwrap } from './supabase';
-import type { Attachment, AudioSegment, Collection, Note, Task } from './types';
+import type {
+  Attachment,
+  AudioSegment,
+  CapacityRow,
+  ClassSessionRow,
+  Collection,
+  Note,
+  ScheduleExceptionRow,
+  StudyWindowRow,
+  Task,
+  WorkHoursRow,
+} from './types';
 
 const SCOPE = { id: 'nhip-sync' };
 
@@ -81,7 +92,10 @@ async function removeObjects(paths: string[]): Promise<void> {
 }
 
 const MUTATIONS = {
-  taskCreate: async (rows: TaskCreate[]) => unwrap(await requireSupabase().from('tasks').insert(rows).select('id')),
+  // Rows in one batch can have different keys (subtasks, estimates…): missing columns must take
+  // their database defaults, not NULL.
+  taskCreate: async (rows: TaskCreate[]) =>
+    unwrap(await requireSupabase().from('tasks').insert(rows, { defaultToNull: false }).select('id')),
   taskUpdate: async ({ id, patch }: { id: string; patch: TaskPatch }) =>
     unwrap(await requireSupabase().from('tasks').update(patch).eq('id', id).select('id')),
   taskDelete: async (id: string) => {
@@ -101,7 +115,7 @@ const MUTATIONS = {
   },
   collectionUpsert: async (row: Pick<Collection, 'id' | 'space' | 'kind' | 'name'> & Partial<Collection>) =>
     unwrap(await requireSupabase().from('collections').upsert(row).select('id')),
-  profileUpdate: async (patch: { display_name?: string | null; ai_privacy_mode?: boolean }) => {
+  profileUpdate: async (patch: { display_name?: string | null; ai_privacy_mode?: boolean; onboarding_completed_at?: string | null }) => {
     const db = requireSupabase();
     const { data } = await db.auth.getSession();
     const uid = data.session?.user.id;
@@ -116,6 +130,22 @@ const MUTATIONS = {
     return unwrap(await db.from('reminder_settings').update(patch).eq('user_id', uid).select('user_id'));
   },
   linkDelete: async (id: string) => unwrap(await requireSupabase().from('attachments').delete().eq('id', id).select('id')),
+  // ----- schedule settings (office hours, study windows, timetable, capacity) -----
+  workHoursUpsert: async (rows: WorkHoursRow[]) =>
+    unwrap(await requireSupabase().from('work_hours').upsert(rows, { onConflict: 'user_id,weekday' }).select('weekday')),
+  studyWindowsReplace: async ({ weekdays, windows }: { weekdays: number[]; windows: StudyWindowRow[] }) => {
+    const db = requireSupabase();
+    unwrap(await db.from('study_windows').delete().in('weekday', weekdays).select('id'));
+    return windows.length ? unwrap(await db.from('study_windows').insert(windows).select('id')) : [];
+  },
+  studyWindowDelete: async (id: string) => unwrap(await requireSupabase().from('study_windows').delete().eq('id', id).select('id')),
+  classSessionUpsert: async (row: ClassSessionRow) => unwrap(await requireSupabase().from('class_sessions').upsert(row).select('id')),
+  classSessionDelete: async (id: string) => unwrap(await requireSupabase().from('class_sessions').delete().eq('id', id).select('id')),
+  exceptionCreate: async (row: ScheduleExceptionRow) =>
+    unwrap(await requireSupabase().from('schedule_exceptions').insert(row).select('id')),
+  exceptionDelete: async (id: string) => unwrap(await requireSupabase().from('schedule_exceptions').delete().eq('id', id).select('id')),
+  capacityUpsert: async (rows: CapacityRow[]) =>
+    unwrap(await requireSupabase().from('capacity_settings').upsert(rows, { onConflict: 'user_id,space,weekday' }).select('space')),
   attachmentCreate: async (row: AttachmentCreate) => unwrap(await requireSupabase().from('attachments').insert(row).select('id')),
   attachmentUpdate: async ({ id, patch }: { id: string; patch: AttachmentPatch }) =>
     unwrap(await requireSupabase().from('attachments').update(patch).eq('id', id).select('id')),
@@ -137,7 +167,10 @@ const MUTATIONS = {
     unwrap(
       await requireSupabase()
         .from('attachments')
-        .insert(rows.map((r) => ({ ...r, type: 'link' as const })))
+        .insert(
+          rows.map((r) => ({ ...r, type: 'link' as const })),
+          { defaultToNull: false },
+        )
         .select('id'),
     ),
 } as const;
@@ -356,6 +389,61 @@ export function useUpdateProfile() {
     onSettled: () => qc.invalidateQueries({ queryKey: qk.settings }),
   });
 }
+
+/** Settings writes: ordered offline queue + optimistic update of the settings bundle. */
+function useSettingsWrite<V>(key: keyof typeof MUTATIONS, apply: (b: SettingsBundle, v: V) => SettingsBundle) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: [key],
+    mutationFn: MUTATIONS[key] as unknown as (v: V) => Promise<unknown>,
+    scope: SCOPE,
+    onMutate: async (v: V) => {
+      await qc.cancelQueries({ queryKey: qk.settings });
+      qc.setQueryData<SettingsBundle>(qk.settings, (old) => (old ? apply(old, v) : old));
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: qk.settings }),
+  });
+}
+
+export const useUpsertWorkHours = () =>
+  useSettingsWrite<WorkHoursRow[]>('workHoursUpsert', (b, rows) => ({
+    ...b,
+    workHours: [...b.workHours.filter((w) => !rows.some((r) => r.weekday === w.weekday)), ...rows].sort((a, c) => a.weekday - c.weekday),
+  }));
+
+export const useReplaceStudyWindows = () =>
+  useSettingsWrite<{ weekdays: number[]; windows: StudyWindowRow[] }>('studyWindowsReplace', (b, v) => ({
+    ...b,
+    studyWindows: [...b.studyWindows.filter((w) => !v.weekdays.includes(w.weekday)), ...v.windows],
+  }));
+
+export const useDeleteStudyWindow = () =>
+  useSettingsWrite<string>('studyWindowDelete', (b, id) => ({ ...b, studyWindows: b.studyWindows.filter((w) => w.id !== id) }));
+
+export const useSaveClassSession = () =>
+  useSettingsWrite<ClassSessionRow>('classSessionUpsert', (b, row) => ({
+    ...b,
+    classSessions: [...b.classSessions.filter((c) => c.id !== row.id), row],
+  }));
+
+export const useDeleteClassSession = () =>
+  useSettingsWrite<string>('classSessionDelete', (b, id) => ({
+    ...b,
+    classSessions: b.classSessions.filter((c) => c.id !== id),
+    exceptions: b.exceptions.filter((e) => e.class_session_id !== id),
+  }));
+
+export const useCreateException = () =>
+  useSettingsWrite<ScheduleExceptionRow>('exceptionCreate', (b, row) => ({ ...b, exceptions: [...b.exceptions, row] }));
+
+export const useDeleteException = () =>
+  useSettingsWrite<string>('exceptionDelete', (b, id) => ({ ...b, exceptions: b.exceptions.filter((e) => e.id !== id) }));
+
+export const useUpsertCapacity = () =>
+  useSettingsWrite<CapacityRow[]>('capacityUpsert', (b, rows) => ({
+    ...b,
+    capacity: [...b.capacity.filter((c) => !rows.some((r) => r.space === c.space && r.weekday === c.weekday)), ...rows],
+  }));
 
 export function useUpdateReminders() {
   const qc = useQueryClient();

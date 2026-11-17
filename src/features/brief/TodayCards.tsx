@@ -34,7 +34,7 @@ export function MorningBriefCard() {
         </AppText>
       ))}
       <View style={styles.row}>
-        <Button label={vi.brief.viewFull} variant="secondary" onPress={() => router.push('/brief')} style={styles.flex} />
+        <Button label={vi.brief.viewFull} variant="secondary" onPress={() => router.push('/brief')} style={styles.grow} />
         <Button label={vi.brief.dismiss} variant="ghost" onPress={() => dismiss(brief.date)} />
       </View>
     </Card>
@@ -71,6 +71,8 @@ export function NotificationPromptCard() {
 }
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', gap: spacing.sm, alignItems: 'center' },
+  grow: { flexGrow: 1, flexBasis: 120 },
+  // Wraps instead of squeezing labels when text is large or the screen is narrow.
+  row: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, alignItems: 'center' },
   flex: { flex: 1 },
 });

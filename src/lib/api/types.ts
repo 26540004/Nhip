@@ -184,6 +184,7 @@ export interface ScheduleExceptionRow {
   type: 'cancelled' | 'moved' | 'extra';
   new_start_at: string | null;
   new_end_at: string | null;
+  note?: string | null;
 }
 
 export interface CapacityRow {
