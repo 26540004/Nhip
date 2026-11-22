@@ -28,6 +28,7 @@ import {
   summarize,
   transcribeSegment,
 } from '../_shared/transcribe-core.ts';
+import { expiryFrom } from '../_shared/audio-retention.ts';
 
 const FN = 'transcribe-audio';
 /** Do not start another segment after this much wall time in one invocation. */
@@ -35,7 +36,7 @@ const START_BUDGET_MS = 60_000;
 
 const Body = z.object({
   mode: z.literal('cron').optional(),
-  action: z.enum(['start', 'retry', 'summarize', 'process']).optional(),
+  action: z.enum(['start', 'retry', 'summarize', 'process', 'delete_audio']).optional(),
   attachment_id: z.string().uuid().optional(),
   segment_id: z.string().uuid().optional(),
 });
@@ -152,6 +153,13 @@ async function maybeFinalize(svc: SupabaseClient, attachmentId: string, forceSum
   }
   const already = att.transcript_status === 'done' && att.summary_json && !forceSummary;
   await svc.from('attachments').update({ transcript_status: 'done', transcript_text: text }).eq('id', attachmentId);
+  // Transcript complete: the audio may now go, automatically after 14 days (countdown in the app).
+  await svc
+    .from('attachments')
+    .update({ audio_expires_at: expiryFrom(Date.now()) })
+    .eq('id', attachmentId)
+    .is('audio_expires_at', null)
+    .is('audio_deleted_at', null);
   if (already) return;
 
   if (!text.trim()) {
@@ -176,6 +184,48 @@ async function maybeFinalize(svc: SupabaseClient, attachmentId: string, forceSum
     // Transcript stays usable; the app offers "Tóm tắt lại".
     log(FN, { event: 'summary_failed', kind: e instanceof Error ? e.name : 'unknown' });
   }
+}
+
+/**
+ * Delete a recording's audio files, keeping transcript, summary and segment rows.
+ * Only after a complete transcript; never touches a failed one (its audio is needed to retry).
+ */
+async function purgeAudio(svc: SupabaseClient, attachmentId: string): Promise<boolean> {
+  const { data: att } = await svc
+    .from('attachments')
+    .select('id, user_id, storage_path, transcript_status, audio_deleted_at')
+    .eq('id', attachmentId)
+    .single();
+  if (!att || att.audio_deleted_at || att.transcript_status !== 'done') return false;
+  const { data: segs } = await svc.from('audio_segments').select('storage_path').eq('attachment_id', attachmentId);
+  const paths = [
+    ...new Set([...(segs ?? []).map((x: { storage_path: string }) => x.storage_path), att.storage_path].filter(Boolean)),
+  ].filter(
+    (path) => String(path).split('/')[0] === att.user_id, // never outside the owner's folder
+  ) as string[];
+  if (paths.length) {
+    const { error } = await svc.storage.from('attachments').remove(paths);
+    if (error) {
+      log(FN, { event: 'purge_failed', files: paths.length });
+      return false;
+    }
+  }
+  await svc.from('attachments').update({ audio_deleted_at: new Date().toISOString(), audio_expires_at: null }).eq('id', attachmentId);
+  log(FN, { event: 'audio_purged', files: paths.length });
+  return true;
+}
+
+async function purgeExpired(svc: SupabaseClient): Promise<number> {
+  const { data } = await svc
+    .from('attachments')
+    .select('id')
+    .eq('type', 'audio')
+    .is('audio_deleted_at', null)
+    .lte('audio_expires_at', new Date().toISOString())
+    .limit(20);
+  let n = 0;
+  for (const a of data ?? []) if (await purgeAudio(svc, a.id)) n++;
+  return n;
 }
 
 async function drain(svc: SupabaseClient, attachmentId: string | null): Promise<number> {
@@ -234,7 +284,8 @@ Deno.serve(async (req) => {
         .gt('updated_at', new Date(Date.now() - 2 * 86_400_000).toISOString())
         .limit(20);
       for (const a of open ?? []) await maybeFinalize(svc, a.id);
-      log(FN, { event: 'cron', processed: n, open: open?.length ?? 0 });
+      const purged = await purgeExpired(svc);
+      log(FN, { event: 'cron', processed: n, open: open?.length ?? 0, purged });
     };
     const pending = inBackground(work());
     if (pending) await pending;
@@ -248,9 +299,22 @@ Deno.serve(async (req) => {
   const action = body.action ?? 'process';
 
   // RLS: only the owner can see the attachment.
-  const { data: att } = await db.from('attachments').select('id, type, transcript_status').eq('id', body.attachment_id).maybeSingle();
+  const { data: att } = await db
+    .from('attachments')
+    .select('id, type, transcript_status, audio_deleted_at')
+    .eq('id', body.attachment_id)
+    .maybeSingle();
   if (!att) return errorResponse('not_found', 404);
   if (att.type !== 'audio') return errorResponse('bad_request', 400, 'not an audio attachment');
+  // "Xoá âm thanh ngay": no AI involved, so allowed in privacy mode too.
+  if (action === 'delete_audio') {
+    if (att.audio_deleted_at) return json({ audio_deleted_at: att.audio_deleted_at }, 200);
+    if (att.transcript_status !== 'done') return errorResponse('not_ready', 409);
+    if (!(await purgeAudio(svc, att.id))) return errorResponse('internal', 500);
+    log(FN, { event: 'request', action });
+    return json({ audio_deleted_at: new Date().toISOString() }, 200);
+  }
+  if (att.audio_deleted_at && action !== 'summarize') return errorResponse('audio_deleted', 409);
   if (await privacyOn(svc, user.id)) return errorResponse('privacy_mode', 403);
   if (aiProviders().filter((p) => p.supportsAudio).length === 0 && !speechToText()) return errorResponse('ai_unavailable', 503);
 

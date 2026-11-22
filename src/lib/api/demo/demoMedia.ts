@@ -12,6 +12,7 @@ import type { ParseTaskResponse, TranscriptSummary } from '../types';
 import { DEMO_UID, type DemoDb, type Row } from './demoDb';
 import { demoParse } from './demoParse';
 import { DEMO_WHITEBOARD } from './seedMedia';
+import { expiryFrom } from '../../../../supabase/functions/_shared/audio-retention.ts';
 
 const THUMBS_KEY = 'nhip-demo-thumbs-v1';
 const objects = new Map<string, string>();
@@ -138,6 +139,7 @@ function step(db: DemoDb, id: string): void {
     const lines = segs.flatMap((s) => (s.transcript_json as { t: number; text: string }[]) ?? []);
     att.transcript_text = lines.map((l) => l.text).join('\n');
     att.transcript_status = 'done';
+    att.audio_expires_at = att.audio_expires_at ?? expiryFrom(Date.now());
     att.summary_json = {
       main_points: [vi.demo.summaryPoint(segs.length)],
       key_terms: [],
@@ -154,6 +156,13 @@ export function demoTranscribe(db: DemoDb, body: Record<string, unknown>) {
   const action = String(body.action ?? 'process');
   const att = db.table('attachments').find((a) => a.id === id);
   if (!att) return { status: 404, error: 'not_found' as const };
+  if (action === 'delete_audio') {
+    if (att.transcript_status !== 'done') return { status: 409, error: 'not_ready' as const };
+    att.audio_deleted_at = att.audio_deleted_at ?? new Date().toISOString();
+    att.audio_expires_at = null;
+    db.save();
+    return { status: 200, data: { audio_deleted_at: att.audio_deleted_at } };
+  }
   const privacy = Boolean(db.table('profiles')[0]?.ai_privacy_mode);
   if (privacy) return { status: 403, error: 'privacy_mode' as const };
   if (action === 'start' || action === 'retry') {

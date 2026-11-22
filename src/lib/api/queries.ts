@@ -223,7 +223,7 @@ export function useTaskBlocks(taskId: string | undefined) {
 }
 
 export const ATTACHMENT_COLUMNS =
-  'id, owner_type, owner_id, type, storage_path, url, title, meta_json, created_at, updated_at, duration_sec, bookmarks_json, transcript_status, transcript_text, summary_json';
+  'id, owner_type, owner_id, type, storage_path, url, title, meta_json, created_at, updated_at, duration_sec, bookmarks_json, transcript_status, transcript_text, summary_json, audio_expires_at, audio_deleted_at';
 
 /** All attachments of a task or note, oldest first. */
 export function useAttachments(ownerId: string | undefined, opts: { poll?: boolean } = {}) {

@@ -94,6 +94,9 @@ export interface Attachment {
   transcript_text?: string | null;
   summary_json?: TranscriptSummary | null;
   updated_at?: string;
+  /** Audio files go 14 days after the transcript is done (or earlier on request). */
+  audio_expires_at?: string | null;
+  audio_deleted_at?: string | null;
 }
 
 /** meta_json of an image attachment. */

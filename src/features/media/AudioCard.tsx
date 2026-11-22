@@ -12,9 +12,12 @@ import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
 import { showToast } from '../../components/Toast';
 import { vi } from '../../i18n/vi';
-import { transcribe } from '../../lib/api/functions';
+import { useQueryClient } from '@tanstack/react-query';
+import { audioState } from '../../../supabase/functions/_shared/audio-retention.ts';
+import { askConfirm } from '../../components/ConfirmHost';
+import { deleteAudio, transcribe } from '../../lib/api/functions';
 import { newId, useCreateTasks, useUpdateAttachment } from '../../lib/api/mutations';
-import { useAttachments, useSegments, useSettings } from '../../lib/api/queries';
+import { qk, useAttachments, useSegments, useSettings } from '../../lib/api/queries';
 import { ApiError, isDemo } from '../../lib/api/supabase';
 import type { Attachment, AudioMeta, AudioSegment, Space, TranscriptLine } from '../../lib/api/types';
 import { useMediaQueue } from '../../lib/media/queue';
@@ -84,11 +87,26 @@ export function AudioCard({
           </Pressable>
         )}
       </View>
-      <Player attachment={attachment} segments={segments}>
-        {(seek, position) => (
-          <TranscriptPanel attachment={attachment} segments={segments} seek={seek} position={position} taskContext={taskContext} />
-        )}
-      </Player>
+      {attachment.audio_deleted_at ? (
+        <>
+          <View style={styles.row}>
+            <Ionicons name="document-text-outline" size={16} color={colors.textMuted} />
+            <AppText variant="meta" tone="muted" style={styles.flex}>
+              {vi.audioRetention.deleted}
+            </AppText>
+          </View>
+          <TranscriptPanel attachment={attachment} segments={segments} seek={() => undefined} position={-1} taskContext={taskContext} />
+        </>
+      ) : (
+        <Player attachment={attachment} segments={segments}>
+          {(seek, position) => (
+            <>
+              <RetentionRow attachment={attachment} />
+              <TranscriptPanel attachment={attachment} segments={segments} seek={seek} position={position} taskContext={taskContext} />
+            </>
+          )}
+        </Player>
+      )}
     </View>
   );
 }
@@ -185,6 +203,47 @@ function Player({
         </AppText>
       )}
       {children((t) => p.seek(t, true), p.position)}
+    </View>
+  );
+}
+
+/** Countdown to the automatic audio deletion, with "Xoá âm thanh ngay". */
+function RetentionRow({ attachment }: { attachment: Attachment }) {
+  const { colors } = useTheme();
+  const qc = useQueryClient();
+  const [now, setNow] = useState(() => Date.now());
+  const [busy, setBusy] = useState(false);
+  const state = audioState(attachment, now);
+  useEffect(() => {
+    if (state.kind !== 'expiring') return;
+    const t = setInterval(() => setNow(Date.now()), 60_000);
+    return () => clearInterval(t);
+  }, [state.kind]);
+  if (state.kind !== 'expiring') return null;
+
+  const remove = async () => {
+    if (!(await askConfirm(vi.audioRetention.confirm, vi.audioRetention.deleteNow))) return;
+    setBusy(true);
+    try {
+      const { audio_deleted_at } = await deleteAudio(attachment.id);
+      qc.setQueryData<Attachment[]>(qk.attachments(attachment.owner_id), (old) =>
+        old?.map((a) => (a.id === attachment.id ? { ...a, audio_deleted_at, audio_expires_at: null } : a)),
+      );
+      void qc.invalidateQueries({ queryKey: ['storage-usage'] });
+      showToast(vi.audioRetention.done);
+    } catch (e) {
+      showToast(errorText(e), { tone: 'error' });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <View style={styles.retention}>
+      <Ionicons name="time-outline" size={16} color={state.days < 1 ? colors.warning : colors.textMuted} />
+      <AppText variant="meta" tone={state.days < 1 ? 'warning' : 'muted'} style={styles.retentionText} accessibilityLiveRegion="polite">
+        {vi.audioRetention.countdown(state.label)}
+      </AppText>
+      <Button label={vi.audioRetention.deleteNow} variant="ghost" icon="trash-outline" loading={busy} onPress={() => void remove()} />
     </View>
   );
 }
@@ -531,5 +590,7 @@ const styles = StyleSheet.create({
   line: { flexDirection: 'row', gap: spacing.sm, paddingVertical: 4, paddingHorizontal: spacing.xs, borderRadius: radius.block },
   stamp: { width: 52, paddingTop: 2 },
   summary: { borderRadius: radius.card, padding: spacing.md, gap: spacing.md },
+  retention: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, flexWrap: 'wrap' },
+  retentionText: { flexGrow: 1, flexShrink: 1, flexBasis: 180 },
   bullet: { flexDirection: 'row', gap: spacing.sm },
 });

@@ -244,6 +244,9 @@ export function seedDemo(now: number = Date.now()): Tables {
       transcript_status: 'done',
       transcript_text: demoTranscriptText(),
       summary_json: DEMO_SUMMARY,
+      // Transcribed 2 days ago → audio auto-deletes in 12 days.
+      audio_expires_at: new Date(now + 12 * 86_400_000 + 5 * 3_600_000).toISOString(),
+      audio_deleted_at: null,
     },
   ];
   const audio_segments: Row[] = segs.map((sg) => ({

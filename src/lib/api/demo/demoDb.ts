@@ -12,7 +12,7 @@ export type Row = Record<string, unknown>;
 export type Tables = Record<string, Row[]>;
 
 export const DEMO_UID = '00000000-0000-4000-8000-00000000d3e0';
-const STORAGE_KEY = 'nhip-demo-db-v2';
+const STORAGE_KEY = 'nhip-demo-db-v3';
 
 const WITH_UPDATED_AT = new Set([
   'tasks',

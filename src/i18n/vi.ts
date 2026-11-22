@@ -247,6 +247,7 @@ export const vi = {
     link_blocked: 'Không thể xem trước địa chỉ này.',
     link_failed: 'Không tải được bản xem trước.',
     not_ready: 'Bản chép lời chưa xong.',
+    audio_deleted: 'Âm thanh của bản ghi này đã được xoá — chỉ còn bản chữ.',
     not_found: 'Không tìm thấy.',
     mic_denied: 'Nhịp chưa được dùng micro. Bật trong Cài đặt › Nhịp › Micro.',
     camera_denied: 'Nhịp chưa được dùng camera. Bật trong Cài đặt › Nhịp › Camera.',
@@ -447,6 +448,20 @@ export const vi = {
     jumpTo: (t: string) => `Tới ${t}`,
   },
 
+  audioRetention: {
+    countdown: (left: string) => `Âm thanh tự xoá sau ${left} · bản chữ và tóm tắt vẫn giữ`,
+    deleteNow: 'Xoá âm thanh ngay',
+    confirm: 'Xoá file âm thanh của bản ghi này? Bản chữ, tóm tắt và việc đã tạo vẫn còn. Không thể hoàn tác.',
+    deleted: 'Đã xoá âm thanh để tiết kiệm dung lượng — bản chữ và tóm tắt vẫn còn.',
+    done: 'Đã xoá âm thanh',
+    kept: 'Âm thanh được giữ cho tới khi chép lời xong.',
+    usageTitle: 'Dung lượng đã dùng',
+    usage: (used: string, total: string) => `${used} / ${total}`,
+    usageParts: (audio: string, image: string) => `Ghi âm ${audio} · Ảnh ${image}`,
+    usageHelp: 'Gói miễn phí của Supabase có 1 GB cho file. Âm thanh tự xoá 14 ngày sau khi chép lời xong nên thường không lo đầy.',
+    usageNear: 'Sắp đầy — hãy xoá bớt âm thanh cũ hoặc nâng gói Supabase.',
+    usageError: 'Chưa xem được dung lượng (cần mạng).',
+  },
   transcript: {
     start: '✦ Phiên âm & tóm tắt',
     startHelp: 'AI chép lời từng đoạn 10 phút, rồi tóm tắt ý chính, thuật ngữ và bài tập.',

@@ -171,6 +171,15 @@ export function createDemoClient() {
     storage: demoStorage,
     rpc: async (fn: string, args: Record<string, unknown>) => {
       if (fn === 'search_all') return { data: searchLocal(String(args.q ?? '')), error: null };
+      if (fn === 'storage_usage') {
+        // Estimate: speech audio ~40 kbps, compressed photos ~350 KB.
+        const atts = demoDb.table('attachments');
+        const audio = atts
+          .filter((a) => a.type === 'audio' && !a.audio_deleted_at)
+          .reduce((s, a) => s + Number(a.duration_sec ?? 0) * 5000, 0);
+        const image = atts.filter((a) => a.type === 'image').length * 350_000;
+        return { data: { audio, image, other: 0 }, error: null };
+      }
       return { data: null, error: { message: `rpc ${fn} not available in demo` } };
     },
     functions: {

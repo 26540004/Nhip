@@ -1,7 +1,10 @@
 /** Cài đặt → Dữ liệu: export everything as a .zip, clear the local cache, sign out. */
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import { formatBytes } from '../../../supabase/functions/_shared/audio-retention.ts';
 import { AppText } from '../../components/AppText';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
@@ -11,10 +14,68 @@ import { Screen } from '../../components/Screen';
 import { showToast } from '../../components/Toast';
 import { useOnline } from '../../hooks/useOnline';
 import { vi } from '../../i18n/vi';
+import { storageUsage } from '../../lib/api/functions';
 import { queryClient, queryPersister } from '../../lib/api/queryClient';
 import { isDemo } from '../../lib/api/supabase';
 import { exportAll } from '../../lib/export/exportData';
+import { useTheme } from '../../theme/ThemeProvider';
 import { signOut } from '../auth/session';
+
+const FREE_STORAGE = 1024 ** 3; // Supabase Free: 1 GB of files
+
+/** "Dung lượng đã dùng": files in Storage (audio, images), against the free 1 GB. */
+function StorageCard() {
+  const { colors } = useTheme();
+  const q = useQuery({ queryKey: ['storage-usage'], queryFn: storageUsage, staleTime: 60_000 });
+  const u = q.data;
+  const used = u ? u.audio + u.image + u.other : 0;
+  const pct = Math.min(1, used / FREE_STORAGE);
+  return (
+    <Card>
+      <AppText variant="section">{vi.audioRetention.usageTitle}</AppText>
+      {u ? (
+        <>
+          <AppText variant="body" tone="heading" numeric>
+            {vi.audioRetention.usage(formatBytes(used), '1 GB')}
+          </AppText>
+          <View
+            accessibilityRole="progressbar"
+            accessibilityLabel={vi.audioRetention.usageTitle}
+            accessibilityValue={{ min: 0, max: 100, now: Math.round(pct * 100) }}
+            style={[styles.rail, { backgroundColor: colors.surface2 }]}
+          >
+            <View
+              style={[
+                styles.fill,
+                { width: `${Math.max(pct * 100, used > 0 ? 1 : 0)}%`, backgroundColor: pct >= 0.8 ? colors.warning : colors.primary },
+              ]}
+            />
+          </View>
+          <AppText variant="meta" tone="muted" numeric>
+            {vi.audioRetention.usageParts(formatBytes(u.audio), formatBytes(u.image + u.other))}
+          </AppText>
+          {pct >= 0.8 && (
+            <AppText variant="secondary" tone="warning">
+              {vi.audioRetention.usageNear}
+            </AppText>
+          )}
+        </>
+      ) : (
+        <AppText variant="secondary" tone="muted">
+          {q.isError ? vi.audioRetention.usageError : vi.states.loading}
+        </AppText>
+      )}
+      <AppText variant="meta" tone="muted">
+        {vi.audioRetention.usageHelp}
+      </AppText>
+    </Card>
+  );
+}
+
+const styles = StyleSheet.create({
+  rail: { height: 8, borderRadius: 4, overflow: 'hidden' },
+  fill: { height: 8, borderRadius: 4 },
+});
 
 export function DataScreen() {
   const online = useOnline();
@@ -42,6 +103,7 @@ export function DataScreen() {
 
   return (
     <Screen title={vi.settingsPages.data.title} right={<HeaderIconButton icon="close" label={vi.common.close} onPress={close} />}>
+      <StorageCard />
       <Card>
         <AppText variant="section">{vi.settingsPages.data.exportTitle}</AppText>
         <AppText variant="secondary" tone="muted">

@@ -19,6 +19,7 @@ export type ErrorCode =
   | 'ai_unavailable'
   | 'ai_quota'
   | 'privacy_mode'
+  | 'audio_deleted'
   | 'not_found'
   | 'gcal_not_connected'
   | 'gcal_revoked'

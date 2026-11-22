@@ -129,6 +129,23 @@ export function transcribe(
   });
 }
 
+/** "Xoá âm thanh ngay": deletes the audio files, keeps transcript and summary. */
+export function deleteAudio(attachmentId: string): Promise<{ audio_deleted_at: string }> {
+  return invoke('transcribe-audio', { attachment_id: attachmentId, action: 'delete_audio' });
+}
+
+export interface StorageUsage {
+  audio: number;
+  image: number;
+  other: number;
+}
+
+export async function storageUsage(): Promise<StorageUsage> {
+  const { data, error } = await requireSupabase().rpc('storage_usage');
+  if (error) throw error;
+  return data as StorageUsage;
+}
+
 export function noteSummarize(noteId: string): Promise<{ summary: TranscriptSummary; provider: string }> {
   return invoke('note-ai', { note_id: noteId, action: 'summarize' });
 }

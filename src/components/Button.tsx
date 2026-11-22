@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import * as Haptics from 'expo-haptics';
 import type { ReactNode } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, View, type PressableProps } from 'react-native';
@@ -10,7 +11,8 @@ export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'ai';
 export interface ButtonProps extends Omit<PressableProps, 'children'> {
   label: string;
   variant?: ButtonVariant;
-  icon?: ReactNode;
+  /** An Ionicons name (tinted to match the label) or any element. */
+  icon?: React.ComponentProps<typeof Ionicons>['name'] | ReactNode;
   loading?: boolean;
   /** Light haptic on press (iOS). */
   haptic?: boolean;
@@ -52,7 +54,7 @@ export function Button({ label, variant = 'primary', icon, loading, disabled, ha
         <ActivityIndicator color={fg} />
       ) : (
         <View style={styles.row}>
-          {icon}
+          {typeof icon === 'string' ? <Ionicons name={icon as React.ComponentProps<typeof Ionicons>['name']} size={18} color={fg} /> : icon}
           <AppText variant="body" style={{ color: fg, fontFamily: 'Inter_600SemiBold' }}>
             {label}
           </AppText>

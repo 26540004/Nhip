@@ -139,12 +139,13 @@ Tạo: 2 môn học (Mạng máy tính, Cơ sở dữ liệu), 2 dự án (Websi
 
 Tự động, chạy lại được:
 - **Jest**: ngày giờ tiếng Việt, khung trống, sức chứa, `validatePlan`/`greedyPlan`, lập lịch thông báo (giới hạn 64), mô hình ghi chú, link preview + SSRF, phiên âm, hàng đợi tải lên, cài đặt giờ giấc, xuất dữ liệu, chia nhỏ việc, hồ sơ thói quen.
-- **Postgres thật** (`scripts/db-check`): migrations + RLS, tìm kiếm không dấu, giới hạn lượt AI, Vault, hồ sơ thói quen (RLS, biệt danh không trùng, tự cắt còn 30 lần sửa).
+- **Postgres thật** (`scripts/db-check`): migrations + RLS, tìm kiếm không dấu, giới hạn lượt AI, Vault, hồ sơ thói quen (RLS, biệt danh không trùng, tự cắt còn 30 lần sửa), dung lượng chỉ tính file của mình, app không tự đánh dấu đã xoá âm thanh.
 - **Đầu-cuối trên dữ liệu seed** (PostgREST + Edge Functions thật, AI giả lập):
   - AI cố tình đề xuất 40 khối sai (Việc lúc 20:00 và giờ nghỉ trưa, Học trùng giờ lên lớp/giờ hành chính, khối 3,5 giờ) → sau khi code kiểm tra: **0 khối Việc ngoài giờ hành chính hay trong giờ nghỉ trưa, 0 khối Học trùng giờ học hoặc giờ hành chính**, không chồng lấn, đệm ≥ 10 phút, không khối nào sau hạn chót.
   - Việc 6 giờ hạn 10:00 sáng mai → cảnh báo rõ "không đủ thời gian", không âm thầm bỏ.
   - Gemini trả 429 → Quick Add tự chuyển sang Groq, người dùng không thấy lỗi.
   - Hồ sơ thói quen: AI đoán sai dự án cho "nộp bt mmt" → biệt danh đã học sửa thành Mạng máy tính; người dùng hay làm lâu 1,45× → việc 60 phút được xếp 90 phút; tắt học → xếp đúng 60 phút và prompt không còn hồ sơ; chế độ riêng tư → câu người dùng từng gõ không rời máy chủ, `learn-style` trả 403.
+  - Âm thanh: chưa chép lời xong → không xoá được, không đếm ngược; xong → đếm ngược đúng 14 ngày; "Xoá ngay" xoá file trong Storage nhưng giữ bản chữ/tóm tắt; chép lời lại → báo `audio_deleted`; cron xoá bản hết hạn và bỏ qua bản chưa chép lời xong.
   - Chế độ riêng tư bật → không request nào tới AI chứa nội dung ghi chú hay mô tả việc; tóm tắt ghi chú/phiên âm bị từ chối.
 - **Giao diện**: mọi màn hình ở 320/375/440 pt và 1280 px — không lỗi console, không tràn ngang, mọi nút có nhãn trợ năng; trạng thái ngoại tuyến hiển thị đúng.
 
@@ -176,6 +177,10 @@ Cần làm trên **iPhone thật** (không giả lập được ở đây): ghi 
 - Việc xử lý chạy nền trên máy chủ (`EdgeRuntime.waitUntil`) và pg_cron chạy tiếp mỗi phút khi còn đoạn chờ, nên không cần giữ app mở. Bản chép lời được tìm kiếm cùng việc và ghi chú.
 - Chế độ riêng tư bật → không gửi âm thanh cho AI (nút phiên âm được thay bằng lời giải thích).
 - Web: ghi được (WebM/MP4 tùy trình duyệt, WebM đi qua Whisper trước) nhưng phải giữ tab mở — app ghi "Ghi âm dài nên dùng trên iPhone".
+
+### Âm thanh tự xoá, chỉ giữ chữ
+
+File âm thanh chỉ cần cho tới khi có bản chép lời (bản chữ một buổi 90 phút ~30–60 KB, file âm thanh ~27 MB). Khi bản chép lời **xong hoàn toàn**, thẻ ghi âm hiện **"Âm thanh tự xoá sau 14 ngày"** (đếm ngược ngày → giờ) và nút **Xoá âm thanh ngay** (có xác nhận). Hết hạn, cron `transcribe-audio` xoá file trong Storage. Bản chép lời có mốc thời gian, tóm tắt, bài tập và việc đã tạo vẫn giữ; "Tóm tắt lại" vẫn chạy. Bản ghi có đoạn chép lời lỗi **không bao giờ** bị xoá (cần âm thanh để thử lại). Xoá ngay được cả khi bật chế độ riêng tư (không dùng AI). Cài đặt → Dữ liệu → **Dung lượng đã dùng** hiện x / 1 GB (ghi âm · ảnh), cảnh báo khi trên 80 %. Migration 007: `audio_expires_at`, `audio_deleted_at` (chỉ máy chủ ghi), RPC `storage_usage()`.
 
 ## Bản demo trên trình duyệt
 

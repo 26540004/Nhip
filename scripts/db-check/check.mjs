@@ -26,7 +26,7 @@ create schema auth; create table auth.users (id uuid primary key, raw_user_meta_
 create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
 grant usage on schema auth to authenticated, anon, service_role; grant execute on function auth.uid() to authenticated, anon, service_role;
 create schema storage; create table storage.buckets (id text primary key, name text, public boolean, file_size_limit bigint);
-create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text);
+create table storage.objects (id uuid primary key default gen_random_uuid(), bucket_id text, name text, owner_id text, metadata jsonb);
 create function storage.foldername(name text) returns text[] language sql immutable as $$ select string_to_array(name, '/') $$;
 create schema vault; create table vault.secrets (id uuid primary key default gen_random_uuid(), name text, secret text, description text);
 create view vault.decrypted_secrets as select id, name, secret as decrypted_secret from vault.secrets;
@@ -136,6 +136,24 @@ if (!process.exitCode) {
     const forA = await fails(`insert into ai_corrections(user_id, input_text, field) values ($1,'x','space')`, [A]);
     check(forA, 'B cannot write corrections for A');
   });
+
+  // Audio retention (migration 007)
+  const [recNote] = await q(`insert into notes(user_id, space, title) values ($1,'study','Ghi âm') returning id`, [A]);
+  const [audio] = await q(
+    `insert into attachments(user_id, owner_type, owner_id, type, storage_path, transcript_status) values ($1,'note',$3,'audio',$2,'none') returning id`,
+    [A, `${A}/rec/seg-000.m4a`, recNote.id],
+  );
+  await q(`insert into storage.objects(bucket_id, name, owner_id, metadata) values ('attachments', $1, $2, '{"size": 3000000, "mimetype": "audio/mp4"}'), ('attachments', $3, $2, '{"size": 400000, "mimetype": "image/jpeg"}'), ('attachments', $4, $5, '{"size": 9999999, "mimetype": "audio/mp4"}')`,
+    [`${A}/rec/seg-000.m4a`, A, `${A}/img/1.jpg`, `${B}/rec/x.m4a`, B]);
+  await as(A, async () => {
+    const [{ storage_usage: u }] = await q('select public.storage_usage()');
+    check(u.audio === 3000000 && u.image === 400000, 'storage_usage counts only my own files', JSON.stringify(u));
+    const cantSet = await fails(`update attachments set audio_deleted_at = now() where id = $1`, [audio.id]);
+    check(cantSet, 'app cannot mark audio deleted itself (server only)');
+  });
+  await c.query('begin'); await c.query('set local role anon');
+  check(await fails('select public.storage_usage()'), 'anon cannot read storage usage');
+  await c.query('rollback');
 }
 
 } catch (e) { console.log('FAIL exception', e.message); process.exitCode = 1; }
