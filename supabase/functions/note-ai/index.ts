@@ -7,6 +7,7 @@
  *   401 · 404 · 403 privacy_mode (note content never goes to AI in privacy mode) · 429 ai_quota · 503 ai_unavailable
  * The note text plus transcripts of its recordings are sent; nothing is logged.
  */
+import { loadHabits } from '../_shared/habits-store.ts';
 import { AIError, generateStructured, SchemaError } from '../_shared/ai-provider.ts';
 import { aiProviders, consumeAiCall, getUser } from '../_shared/context.ts';
 import { corsHeaders, errorResponse, json, log } from '../_shared/http.ts';
@@ -62,9 +63,17 @@ Deno.serve(async (req) => {
   if (!source.trim()) return errorResponse('bad_request', 400, 'empty note');
   if (!(await consumeAiCall(user.id))) return errorResponse('ai_quota', 429);
 
+  const habits = await loadHabits(db, tz, false);
   try {
     if (body.action === 'summarize') {
-      const { summary, provider } = await summarize(providers, 'note', note.title ?? '', source, { log: (e) => log(FN, e) });
+      const { summary, provider } = await summarize(
+        providers,
+        'note',
+        note.title ?? '',
+        source,
+        { log: (e) => log(FN, e) },
+        habits.prompt('notes'),
+      );
       log(FN, { event: 'summary', provider, chars: source.length, ms: Date.now() - started });
       return json({ summary, provider });
     }
@@ -84,10 +93,10 @@ Deno.serve(async (req) => {
     const res = await generateStructured(
       providers,
       AiExtractResponse,
-      { ...prompt, maxOutputTokens: 4096 },
+      { ...prompt, system: prompt.system + habits.prompt('parse'), maxOutputTokens: 4096 },
       { timeoutMs: 30_000, log: (e) => log(FN, e) },
     );
-    const out = finalizeParse(res.data, { text: source, now, tz, collections, url: null, provider: res.provider });
+    const out = finalizeParse(res.data, { text: source, now, tz, collections, url: null, provider: res.provider, alias: habits.alias });
     log(FN, { event: 'extract', provider: res.provider, tasks: out.tasks.length, ms: Date.now() - started });
     return json({ tasks: out.tasks, provider: res.provider });
   } catch (e) {

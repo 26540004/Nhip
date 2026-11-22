@@ -1,0 +1,17 @@
+{
+  "name": "Nhịp — ghi chú, việc cần làm & lịch",
+  "short_name": "Nhịp",
+  "description": "Ghi chú, việc cần làm và lịch cho sinh viên vừa học vừa làm.",
+  "lang": "vi",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#12141F",
+  "theme_color": "#0E1116",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

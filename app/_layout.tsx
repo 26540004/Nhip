@@ -136,6 +136,7 @@ function AppNavigator({ signedIn }: { signedIn: boolean }) {
         <Stack.Screen name="settings/study-windows" />
         <Stack.Screen name="settings/capacity" />
         <Stack.Screen name="settings/data" />
+        <Stack.Screen name="settings/habits" />
         <Stack.Screen name="plan" options={{ presentation: 'modal' }} />
         <Stack.Screen name="brief" />
         <Stack.Screen name="review" />

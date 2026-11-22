@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 /**
  * Quick Add (center ＋ / N).
  * Type a Vietnamese sentence → parse-task returns one or more preview cards with editable
@@ -28,7 +29,8 @@ import { showToast } from '../../components/Toast';
 import { useNow } from '../../hooks/useNow';
 import { vi } from '../../i18n/vi';
 import { parseTask } from '../../lib/api/functions';
-import { newId, type TaskCreate, useCreateLinks, useCreateTasks } from '../../lib/api/mutations';
+import { type CorrectionRow, useAddVocab, useHabits, type VocabRow, vocabRow } from '../../lib/api/habits';
+import { enqueueWrite, newId, type TaskCreate, useCreateLinks, useCreateTasks } from '../../lib/api/mutations';
 import { useCollections } from '../../lib/api/queries';
 import { ApiError } from '../../lib/api/supabase';
 import type { ParsedTask } from '../../lib/api/types';
@@ -36,10 +38,11 @@ import { extractUrlClient } from '../../lib/tasks/url';
 import { formatDurationLong } from '../../lib/time/format';
 import { useUiStore } from '../../stores/ui';
 import { useTheme } from '../../theme/ThemeProvider';
+import { diffCorrections, type DraftFields } from './corrections';
 import { radius, spacing } from '../../theme/tokens';
 import { type as typeScale } from '../../theme/typography';
 
-type Draft = ParsedTask & { key: string; includeSubtasks: boolean };
+type Draft = ParsedTask & { key: string; includeSubtasks: boolean; ai: DraftFields };
 type Field = 'space' | 'collection' | 'deadline' | 'estimate' | 'priority';
 
 export function QuickAddSheet() {
@@ -51,6 +54,9 @@ export function QuickAddSheet() {
   const collections = useCollections().data ?? [];
   const createTasks = useCreateTasks();
   const createLinks = useCreateLinks();
+  const habits = useHabits({ enabled: open }).data;
+  const addVocab = useAddVocab();
+  const qc = useQueryClient();
 
   const [text, setText] = useState('');
   const [focused, setFocused] = useState(false);
@@ -58,6 +64,7 @@ export function QuickAddSheet() {
   const [failure, setFailure] = useState<string | null>(null);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [url, setUrl] = useState<string | null>(null);
+  const [sourceText, setSourceText] = useState('');
   const [editing, setEditing] = useState<{ key: string; field: Field } | null>(null);
 
   const reset = () => {
@@ -79,7 +86,21 @@ export function QuickAddSheet() {
     setFailure(null);
     try {
       const res = await parseTask(input);
-      setDrafts(res.tasks.map((t) => ({ ...t, key: newId(), includeSubtasks: t.subtasks.length > 0 })));
+      setDrafts(
+        res.tasks.map((t) => ({
+          ...t,
+          key: newId(),
+          includeSubtasks: t.subtasks.length > 0,
+          ai: {
+            title: t.title,
+            space: t.space,
+            collection_id: t.collection_id,
+            deadline_at: t.deadline_at,
+            estimate_minutes: t.estimate_minutes,
+          },
+        })),
+      );
+      setSourceText(input);
       setUrl(res.url);
     } catch (e) {
       const msg = errorMessage(e);
@@ -90,6 +111,24 @@ export function QuickAddSheet() {
   };
 
   const update = (key: string, patch: Partial<Draft>) => setDrafts((ds) => ds.map((d) => (d.key === key ? { ...d, ...patch } : d)));
+
+  /** "Nhịp hiểu về bạn": remember what the user fixed so the next suggestion is closer. */
+  const learnFromEdits = () => {
+    if (habits && !habits.learningEnabled) return;
+    const name = (id: string | null) => collections.find((c) => c.id === id)?.name ?? null;
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Ho_Chi_Minh';
+    const known = (habits?.vocab ?? []).map((v) => v.short);
+    const rows: CorrectionRow[] = [];
+    const aliases: VocabRow[] = [];
+    for (const d of drafts) {
+      const r = diffCorrections(drafts.length === 1 ? sourceText : d.ai.title, d.ai, d, { collectionName: name, tz, knownShorts: known });
+      rows.push(...r.corrections.map((c) => ({ ...c, id: newId() })));
+      if (r.alias && !aliases.some((a) => a.short === r.alias!.short))
+        aliases.push(vocabRow(r.alias.short, r.alias.meaning, r.alias.collection_id, 'learned'));
+    }
+    if (rows.length) void enqueueWrite(qc, 'correctionsCreate', rows).catch(() => undefined);
+    if (aliases.length) addVocab.mutate(aliases);
+  };
 
   const save = () => {
     const rows: TaskCreate[] = [];
@@ -125,6 +164,7 @@ export function QuickAddSheet() {
       }
     }
     createTasks.mutate(rows);
+    learnFromEdits();
     if (url) createLinks.mutate(topIds.map((owner_id) => ({ id: newId(), owner_type: 'task' as const, owner_id, url })));
     showToast(vi.quickAdd.savedCount(topIds.length));
     close();

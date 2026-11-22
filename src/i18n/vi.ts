@@ -507,6 +507,72 @@ export const vi = {
     version: (v: string) => `Nhịp ${v}`,
   },
 
+  habits: {
+    title: 'Nhịp hiểu về bạn',
+    rowSummary: (n: number, vocab: number) =>
+      n === 0 && vocab === 0 ? 'Chưa có dữ liệu — trả lời 2 câu hỏi để bắt đầu' : `Học từ ${n} việc đã xong · ${vocab} từ viết tắt`,
+    intro:
+      'Nhịp tự học từ chính cách bạn dùng app: việc thật sự mất bao lâu, bạn hay làm lúc nào, và cách bạn viết tắt. AI dùng những điều này khi phân tích và xếp lịch; quy tắc của bạn vẫn luôn được ưu tiên.',
+    learning: 'Cho Nhịp học thói quen',
+    learningHelp: 'Tắt thì AI không dùng hồ sơ này và Nhịp ngừng ghi nhận chỉnh sửa. Dữ liệu cũ vẫn giữ cho tới khi bạn xoá.',
+    sections: {
+      questions: 'Câu hỏi nhanh',
+      estimates: 'Thời gian thật so với dự kiến',
+      focus: 'Giờ bạn hay làm',
+      vocab: 'Từ viết tắt & biệt danh',
+      importer: 'Nhập ghi chú cũ',
+      corrections: 'Những lần bạn sửa AI',
+    },
+    overrunQ: 'Bạn có hay làm lâu hơn dự kiến không?',
+    overrun: { often: 'Thường xuyên', sometimes: 'Thỉnh thoảng', rarely: 'Hiếm khi' },
+    focusQ: (space: string) => `Bạn tập trung ${space} tốt nhất lúc nào?`,
+    periods: { morning: 'Sáng', afternoon: 'Chiều', evening: 'Tối', night: 'Khuya' },
+    estimateLine: (ratio: number) =>
+      ratio >= 1.1
+        ? `Thường lâu hơn ${Math.round((ratio - 1) * 100)}%`
+        : ratio <= 0.9
+          ? `Thường nhanh hơn ${Math.round((1 - ratio) * 100)}%`
+          : 'Khá đúng dự kiến',
+    estimateMeta: (n: number, conf: 'low' | 'medium' | 'high') =>
+      n === 0
+        ? 'Theo câu trả lời của bạn'
+        : `${n} việc · ${conf === 'high' ? 'tin cậy cao' : conf === 'medium' ? 'tin cậy vừa' : 'còn ít dữ liệu'}`,
+    estimateEmpty: 'Khi bạn ghi thời gian thật ở bước tổng kết buổi tối, Nhịp sẽ biết mỗi loại việc thường mất bao lâu.',
+    estimateApplied: 'Khi xếp lịch, Nhịp chừa thêm thời gian theo tỉ lệ này (tối đa gấp đôi).',
+    focusEmpty: 'Chưa đủ dữ liệu. Nhịp sẽ tự nhận ra sau khoảng 5 việc đã xong.',
+    focusFromAnswers: 'theo câu trả lời',
+    focusFromData: (n: number) => `${n} việc xong`,
+    vocabEmpty: 'Chưa có. Thêm tay, nhập ghi chú cũ, hoặc cứ dùng — khi bạn sửa môn học sau Quick Add, Nhịp sẽ tự nhớ.',
+    short: 'Viết tắt',
+    meaning: 'Nghĩa là',
+    shortPh: 'vd. mmt',
+    meaningPh: 'vd. Mạng máy tính',
+    linkTo: 'Gắn với môn học / dự án (tuỳ chọn)',
+    add: 'Thêm',
+    source: { user: 'Bạn thêm', learned: 'Tự học', import: 'Từ ghi chú' },
+    deleteVocab: (s: string) => `Xoá "${s}"`,
+    importHelp:
+      'Dán vài ghi chú cũ (từ Notes, Zalo, giấy chụp lại…). Nhịp tìm những từ bạn hay viết tắt; bạn chọn cái nào giữ lại. Nội dung dán không được lưu.',
+    importPh: 'Dán ghi chú cũ ở đây…',
+    importRun: 'Tìm từ viết tắt',
+    importNone: 'Không tìm thấy từ viết tắt mới.',
+    importSave: (n: number) => `Lưu ${n} từ`,
+    importSaved: (n: number) => `Đã lưu ${n} từ`,
+    importTooShort: 'Dán ít nhất vài câu nhé.',
+    correctionsEmpty: 'Chưa có. Khi bạn sửa gợi ý của AI trong Quick Add, Nhịp ghi lại để lần sau đoán đúng hơn.',
+    correctionLine: (field: string, ai: string | null, user: string | null) => `${field}: ${ai ?? 'trống'} → ${user ?? 'trống'}`,
+    fields: { collection: 'Môn/dự án', space: 'Không gian', deadline: 'Hạn', estimate: 'Thời lượng', title: 'Tên' },
+    deleteCorrection: 'Xoá lần sửa này',
+    privacyNote: 'Đang bật chế độ riêng tư: AI chỉ nhận tỉ lệ thời gian, giờ hay làm và từ viết tắt — không nhận câu bạn từng gõ.',
+    reset: 'Xoá toàn bộ hồ sơ',
+    resetConfirm: 'Xoá câu trả lời, từ viết tắt và các lần sửa? Việc đã xong không bị ảnh hưởng.',
+    resetDone: 'Đã xoá hồ sơ thói quen',
+    todayCardTitle: 'Giúp Nhịp hiểu bạn nhanh hơn',
+    todayCardBody: '2 câu hỏi, chưa tới 30 giây — Nhịp xếp lịch sát với bạn hơn ngay từ hôm nay.',
+    todayCardGo: 'Trả lời',
+    todayCardSkip: 'Để sau',
+  },
+
   settingsPages: {
     saved: 'Đã lưu',
     timetableSummary: (sessions: number, exceptions: number) =>

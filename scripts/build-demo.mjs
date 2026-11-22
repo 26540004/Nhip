@@ -36,6 +36,10 @@ html = html
   .replace('<head>', `<head>\n    ${pinBase}`)
   .replaceAll('src="/_expo/static/js/web/', 'src="js/')
   .replace('href="/favicon.ico"', 'href="favicon.ico"')
+  .replace('href="/manifest.json"', 'href="manifest.json"')
+  .replace('href="/apple-touch-icon.png"', 'href="apple-touch-icon.png"')
+  // The hosted demo is not an installable app: no service worker there.
+  .replace("if ('serviceWorker' in navigator && ", 'if (false && ')
   .replace('<html lang="en">', '<html lang="vi">')
   .replace('<title>Nhịp</title>', '<title>Nhịp — bản demo</title>');
 fs.writeFileSync(indexPath, html);

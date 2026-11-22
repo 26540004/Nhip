@@ -117,6 +117,25 @@ if (!process.exitCode) {
   check((await q('select count(*)::int n from vault.secrets'))[0].n === 1, 'single vault secret per user');
   await q('select delete_google_refresh_token($1)', [A]);
   check((await q('select count(*)::int n from vault.secrets'))[0].n === 0, 'disconnect deletes vault secret');
+
+  // Habit profile (migration 006)
+  await as(A, async () => {
+    await q(`insert into habit_settings(answers) values ('{"overrun":"often"}')`);
+    await q(`insert into vocab_entries(short, meaning, collection_id) values ('mmt','Mạng máy tính',$1)`, [col.id]);
+    const dupCaught = await fails(`insert into vocab_entries(short, meaning) values (' MMT ','x')`);
+    check(dupCaught, 'vocab: one entry per abbreviation (case/space-insensitive)');
+    await q(`insert into vocab_entries(short, meaning) values ('MMT','x') on conflict (user_id, short_key) do nothing`);
+    check((await q('select count(*)::int n from vocab_entries'))[0].n === 1, 'vocab: upsert on short_key ignores duplicates');
+    for (let i = 0; i < 35; i++) await q(`insert into ai_corrections(input_text, field, user_value) values ($1,'collection','Mạng máy tính')`, [`câu ${i}`]);
+    check((await q('select count(*)::int n from ai_corrections'))[0].n === 30, 'corrections trimmed to the last 30');
+  });
+  await as(B, async () => {
+    check((await q('select * from vocab_entries')).length === 0 && (await q('select * from habit_settings')).length === 0, 'RLS: B cannot see A habit profile');
+    const colBad = await fails(`insert into vocab_entries(short, meaning, collection_id) values ('x','y',$1)`, [col.id]);
+    check(colBad, "B cannot point a nickname at A's subject");
+    const forA = await fails(`insert into ai_corrections(user_id, input_text, field) values ($1,'x','space')`, [A]);
+    check(forA, 'B cannot write corrections for A');
+  });
 }
 
 } catch (e) { console.log('FAIL exception', e.message); process.exitCode = 1; }

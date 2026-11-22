@@ -9,6 +9,7 @@
 import { type QueryClient, useMutation, useMutationState, useQueryClient } from '@tanstack/react-query';
 import * as Crypto from 'expo-crypto';
 import { qk, type NoteListItem, type SettingsBundle } from './queries';
+import type { CorrectionRow, HabitAnswers, VocabRow } from './habits';
 import { requireSupabase, unwrap } from './supabase';
 import type {
   Attachment,
@@ -163,6 +164,28 @@ const MUTATIONS = {
     unwrap(await requireSupabase().from('audio_segments').upsert(row, { onConflict: 'attachment_id,seq' }).select('id')),
   segmentUpdate: async ({ id, patch }: { id: string; patch: { uploaded?: boolean; duration_sec?: number } }) =>
     unwrap(await requireSupabase().from('audio_segments').update(patch).eq('id', id).select('id')),
+  // ----- habit profile ("Nhịp hiểu về bạn") -----
+  habitSettingsUpsert: async (row: { learning_enabled?: boolean; answers?: HabitAnswers }) =>
+    unwrap(await requireSupabase().from('habit_settings').upsert(row, { onConflict: 'user_id', defaultToNull: false }).select('user_id')),
+  vocabCreate: async (rows: VocabRow[]) =>
+    unwrap(
+      await requireSupabase()
+        .from('vocab_entries')
+        .upsert(rows, { onConflict: 'user_id,short_key', ignoreDuplicates: true, defaultToNull: false })
+        .select('id'),
+    ),
+  vocabDelete: async (id: string) => unwrap(await requireSupabase().from('vocab_entries').delete().eq('id', id).select('id')),
+  correctionsCreate: async (rows: CorrectionRow[]) =>
+    rows.length ? unwrap(await requireSupabase().from('ai_corrections').insert(rows).select('id')) : [],
+  correctionDelete: async (id: string) => unwrap(await requireSupabase().from('ai_corrections').delete().eq('id', id).select('id')),
+  habitsReset: async () => {
+    const db = requireSupabase();
+    // Deletes are RLS-scoped to the signed-in user; the filter is only to satisfy PostgREST.
+    unwrap(await db.from('ai_corrections').delete().not('id', 'is', null).select('id'));
+    unwrap(await db.from('vocab_entries').delete().not('id', 'is', null).select('id'));
+    unwrap(await db.from('habit_settings').delete().not('user_id', 'is', null).select('user_id'));
+    return true;
+  },
   linkCreate: async (rows: LinkAttachmentCreate[]) =>
     unwrap(
       await requireSupabase()
@@ -175,7 +198,7 @@ const MUTATIONS = {
     ),
 } as const;
 
-type MutationName = keyof typeof MUTATIONS;
+export type MutationName = keyof typeof MUTATIONS;
 
 /** Call once at startup, before persisted mutations are resumed. */
 export function registerMutationDefaults(client: QueryClient): void {
@@ -390,6 +413,18 @@ export function useUpdateProfile() {
   });
 }
 
+/** Generic queued write for feature modules (same ordered, persisted offline queue). */
+export function useQueuedWrite<V>(key: MutationName, opts: { onMutate?: (v: V) => void | Promise<void>; invalidate: readonly unknown[] }) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationKey: [key],
+    mutationFn: MUTATIONS[key] as unknown as (v: V) => Promise<unknown>,
+    scope: SCOPE,
+    onMutate: opts.onMutate,
+    onSettled: () => qc.invalidateQueries({ queryKey: opts.invalidate }),
+  });
+}
+
 /** Settings writes: ordered offline queue + optimistic update of the settings bundle. */
 function useSettingsWrite<V>(key: keyof typeof MUTATIONS, apply: (b: SettingsBundle, v: V) => SettingsBundle) {
   const qc = useQueryClient();
@@ -538,7 +573,8 @@ export function useDeleteAttachment(ownerId: string) {
  * They go through the same persisted, ordered queue as every other write.
  */
 export function enqueueWrite<
-  K extends 'segmentCreate' | 'segmentUpdate' | 'attachmentUpdate' | 'attachmentCreate' | 'attachmentDelete' | 'taskCreate',
+  K extends
+    'segmentCreate' | 'segmentUpdate' | 'attachmentUpdate' | 'attachmentCreate' | 'attachmentDelete' | 'taskCreate' | 'correctionsCreate',
 >(client: QueryClient, key: K, variables: Parameters<(typeof MUTATIONS)[K]>[0]): Promise<unknown> {
   // Optimistic cache updates (the hooks do this in onMutate).
   if (key === 'attachmentCreate') {
@@ -565,6 +601,7 @@ export function enqueueWrite<
   const m = client.getMutationCache().build(client, client.defaultMutationOptions({ mutationKey: [key], scope: SCOPE }));
   return m.execute(variables as never).then((r) => {
     if (key === 'taskCreate') void client.invalidateQueries({ queryKey: qk.tasks });
+    else if (key === 'correctionsCreate') void client.invalidateQueries({ queryKey: ['habits'] });
     else if (key === 'segmentCreate' || key === 'segmentUpdate') {
       const attId = key === 'segmentCreate' ? (variables as SegmentCreate).attachment_id : null;
       void client.invalidateQueries({ queryKey: attId ? qk.segments(attId) : ['segments'] });

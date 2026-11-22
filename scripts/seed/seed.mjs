@@ -131,7 +131,7 @@ if (existing.length && !flag('wipe')) {
   process.exit(2);
 }
 if (flag('wipe')) {
-  for (const t of ['task_blocks', 'attachments', 'tasks', 'notes', 'schedule_exceptions', 'class_sessions', 'collections', 'study_windows', 'ai_proposals'])
+  for (const t of ['task_blocks', 'attachments', 'tasks', 'notes', 'schedule_exceptions', 'class_sessions', 'vocab_entries', 'ai_corrections', 'habit_settings', 'collections', 'study_windows', 'ai_proposals'])
     await must(db.from(t).delete().eq('user_id', uid), `wipe ${t}`);
   console.log('Đã xóa dữ liệu cũ.');
 }

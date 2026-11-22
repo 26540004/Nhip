@@ -319,11 +319,16 @@ export async function summarize(
   title: string,
   body: string,
   opts: CallOptions = {},
+  /** Habit vocabulary so the summary keeps the user's own abbreviations right. */
+  habitsText = '',
 ): Promise<{ summary: Summary; provider: string }> {
   const res = await generateStructured(
     providers,
     Summary,
-    { ...summaryPrompt(kind, title, body), maxOutputTokens: 4096 },
+    (() => {
+      const p = summaryPrompt(kind, title, body);
+      return { ...p, system: p.system + habitsText, maxOutputTokens: 4096 };
+    })(),
     { timeoutMs: 60_000, ...opts },
   );
   return { summary: res.data, provider: res.provider };

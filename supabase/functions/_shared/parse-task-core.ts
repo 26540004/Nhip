@@ -92,26 +92,29 @@ export interface PromptContext {
   tz: string;
   collections: readonly CollectionRef[];
   officeHoursSummary: string;
+  /** Habit summary (vocabulary, past corrections). */
+  habitsText?: string;
 }
 
 export function buildPrompt(ctx: PromptContext): { system: string; user: string } {
-  const system = [
-    'You extract to-do tasks from short Vietnamese notes for a personal planner. Output ONLY JSON.',
-    'Schema: {"tasks":[{"title":string,"space":"study"|"work","space_confident":boolean,"collection_name":string|null,',
-    '"deadline_phrase":string|null,"deadline_at":string|null,"estimate_phrase":string|null,"estimate_minutes":number|null,',
-    '"priority":1|2|3,"priority_reason":string,"subtasks":[{"title":string,"estimate_minutes":number}]}]}',
-    'Rules:',
-    '- One sentence may contain several tasks (split on commas, "và", ";" when they are separate actions). Max 10.',
-    '- title: short Vietnamese imperative, WITHOUT the date/time/duration words, keep subject/client names. Capitalize first letter.',
-    '- deadline_phrase: copy EXACTLY the words from the input that express when (e.g. "thứ 6", "mai", "thứ 4 2h chiều", "trước 5h chiều", "tối nay"). null if none. Include the time words for that task only.',
-    '- deadline_at: your best ISO 8601 with offset for that phrase (code will recompute it), or null.',
-    '- estimate_phrase: copy EXACTLY the words expressing how long it takes ("khoảng 3 tiếng", "45 phút"); null if none. estimate_minutes: your number or null.',
-    '- space: "study" for coursework (môn, bài tập, thi, đồ án, bài giảng, subjects listed below with space study); "work" for office tasks (họp, khách hàng, sếp, báo cáo công việc, projects with space work). space_confident=false when unsure.',
-    '- collection_name: the matching name from the list below, or null. Never invent one.',
-    '- priority: 1 = cao (deadline ≤ 2 days, exams, important clients), 2 = vừa, 3 = thấp. priority_reason: ONE short Vietnamese sentence (≤ 12 words).',
-    '- subtasks: only when the estimate is > 120 minutes: 2–5 concrete Vietnamese steps of 30–90 min each summing to the estimate. Otherwise [].',
-    '- Never add tasks that are not in the input.',
-  ].join('\n');
+  const system =
+    [
+      'You extract to-do tasks from short Vietnamese notes for a personal planner. Output ONLY JSON.',
+      'Schema: {"tasks":[{"title":string,"space":"study"|"work","space_confident":boolean,"collection_name":string|null,',
+      '"deadline_phrase":string|null,"deadline_at":string|null,"estimate_phrase":string|null,"estimate_minutes":number|null,',
+      '"priority":1|2|3,"priority_reason":string,"subtasks":[{"title":string,"estimate_minutes":number}]}]}',
+      'Rules:',
+      '- One sentence may contain several tasks (split on commas, "và", ";" when they are separate actions). Max 10.',
+      '- title: short Vietnamese imperative, WITHOUT the date/time/duration words, keep subject/client names. Capitalize first letter.',
+      '- deadline_phrase: copy EXACTLY the words from the input that express when (e.g. "thứ 6", "mai", "thứ 4 2h chiều", "trước 5h chiều", "tối nay"). null if none. Include the time words for that task only.',
+      '- deadline_at: your best ISO 8601 with offset for that phrase (code will recompute it), or null.',
+      '- estimate_phrase: copy EXACTLY the words expressing how long it takes ("khoảng 3 tiếng", "45 phút"); null if none. estimate_minutes: your number or null.',
+      '- space: "study" for coursework (môn, bài tập, thi, đồ án, bài giảng, subjects listed below with space study); "work" for office tasks (họp, khách hàng, sếp, báo cáo công việc, projects with space work). space_confident=false when unsure.',
+      '- collection_name: the matching name from the list below, or null. Never invent one.',
+      '- priority: 1 = cao (deadline ≤ 2 days, exams, important clients), 2 = vừa, 3 = thấp. priority_reason: ONE short Vietnamese sentence (≤ 12 words).',
+      '- subtasks: only when the estimate is > 120 minutes: 2–5 concrete Vietnamese steps of 30–90 min each summing to the estimate. Otherwise [].',
+      '- Never add tasks that are not in the input.',
+    ].join('\n') + (ctx.habitsText ?? '');
 
   const cols =
     ctx.collections.length === 0
@@ -149,7 +152,16 @@ function capitalize(s: string): string {
 
 export function finalizeParse(
   ai: AiParseResponse,
-  ctx: { text: string; now: number; tz: string; collections: readonly CollectionRef[]; url: string | null; provider: string },
+  ctx: {
+    text: string;
+    now: number;
+    tz: string;
+    collections: readonly CollectionRef[];
+    url: string | null;
+    provider: string;
+    /** Learned nickname → subject/project ("mmt" → Mạng máy tính); beats the AI's guess. */
+    alias?: (text: string) => { collection_id: string | null } | null;
+  },
 ): ParseTaskResponse {
   const tasks: ParsedTask[] = ai.tasks.map((t) => {
     // Deadline: deterministic from the quoted phrase; AI's ISO only as a sanity-checked fallback.
@@ -165,7 +177,10 @@ export function finalizeParse(
     if (estimate == null) estimate = t.estimate_minutes;
 
     // Match against this task's own title (not the whole sentence) plus the AI's hint.
-    const chosen = matchCollection(t.title, ctx.collections, t.collection_name);
+    const aliased = ctx.alias?.(t.title) ?? (ai.tasks.length === 1 ? ctx.alias?.(ctx.text) : null);
+    const chosen =
+      (aliased?.collection_id ? ctx.collections.find((c) => c.id === aliased.collection_id) : undefined) ??
+      matchCollection(t.title, ctx.collections, t.collection_name);
 
     const keyword = guessSpace(t.title);
     let space = t.space;

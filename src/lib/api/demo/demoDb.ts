@@ -226,6 +226,7 @@ function opPred(col: string, op: string, val: string): Pred {
 
 export class Query implements PromiseLike<Result> {
   private op: 'select' | 'insert' | 'update' | 'upsert' | 'delete' = 'select';
+  private ignoreDup = false;
   private returning = false;
   private conflict: string[] | null = null;
   private filters: Pred[] = [];
@@ -254,9 +255,10 @@ export class Query implements PromiseLike<Result> {
     this.payload = rows;
     return this;
   }
-  upsert(rows: Row | Row[], opts?: { onConflict?: string }): this {
+  upsert(rows: Row | Row[], opts?: { onConflict?: string; ignoreDuplicates?: boolean }): this {
     this.op = 'upsert';
     this.payload = rows;
+    this.ignoreDup = opts?.ignoreDuplicates ?? false;
     this.conflict = opts?.onConflict
       ? opts.onConflict
           .split(',')
@@ -381,7 +383,17 @@ export class Query implements PromiseLike<Result> {
     if (this.op === 'insert' || this.op === 'upsert') {
       const list = (Array.isArray(this.payload) ? this.payload : [this.payload!]) as Row[];
       const done: Row[] = [];
-      for (const r of list) {
+      for (const raw of list) {
+        // Generated column (see migration 006).
+        const r =
+          t === 'vocab_entries'
+            ? {
+                ...raw,
+                short_key: String(raw.short ?? '')
+                  .trim()
+                  .toLowerCase(),
+              }
+            : raw;
         const conflict = this.conflict;
         const existing =
           this.op !== 'upsert'
@@ -391,6 +403,7 @@ export class Query implements PromiseLike<Result> {
               : r.id != null
                 ? this.db.table(t).find((x) => x.id === r.id)
                 : undefined;
+        if (existing && this.ignoreDup) continue;
         if (existing) {
           Object.assign(existing, r, WITH_UPDATED_AT.has(t) ? { updated_at: new Date().toISOString() } : {});
           done.push(existing);

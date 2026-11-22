@@ -12,6 +12,7 @@ import { getPermission, type PermissionState, registerPushToken, requestPermissi
 import { useUiStore } from '../../stores/ui';
 import { spacing } from '../../theme/tokens';
 import { useBriefInput } from './useBriefData';
+import { useHabits, useSaveHabitSettings } from '../../lib/api/habits';
 
 export function MorningBriefCard() {
   const { input, ready } = useBriefInput();
@@ -65,6 +66,27 @@ export function NotificationPromptCard() {
           style={styles.flex}
         />
         <Button label={vi.reminders.later} variant="ghost" onPress={dismiss} />
+      </View>
+    </Card>
+  );
+}
+
+/** Until the 2 quick questions are answered (or skipped): a nudge to "Nhịp hiểu về bạn". */
+export function HabitsPromptCard() {
+  const habits = useHabits().data;
+  const save = useSaveHabitSettings();
+  if (!habits || habits.answered || !habits.learningEnabled) return null;
+  return (
+    <Card ai>
+      <AppText variant="listTitle">{vi.habits.todayCardTitle}</AppText>
+      <AppText variant="secondary">{vi.habits.todayCardBody}</AppText>
+      <View style={styles.row}>
+        <Button label={vi.habits.todayCardGo} icon="sparkles" onPress={() => router.push('/settings/habits')} style={styles.flex} />
+        <Button
+          label={vi.habits.todayCardSkip}
+          variant="ghost"
+          onPress={() => save.mutate({ answers: { ...habits.answers, skipped: true } })}
+        />
       </View>
     </Card>
   );

@@ -11,6 +11,7 @@ import { SettingsRow } from '../../components/SettingsRow';
 import { showToast } from '../../components/Toast';
 import { useNow } from '../../hooks/useNow';
 import { vi } from '../../i18n/vi';
+import { useHabits } from '../../lib/api/habits';
 import { useUpdateProfile } from '../../lib/api/mutations';
 import { useCollections, useGoogleConnection, useSettings } from '../../lib/api/queries';
 import { queryClient } from '../../lib/api/queryClient';
@@ -30,6 +31,7 @@ export function SettingsScreen() {
   const collections = useCollections().data ?? [];
   const now = useNow();
   const updateProfile = useUpdateProfile();
+  const habits = useHabits().data;
   const s = settings.data;
   const profile = s?.profile;
   // The counter resets per local day (see consume_ai_call).
@@ -131,6 +133,12 @@ export function SettingsScreen() {
             active.filter((c) => c.space === 'work').length,
           )}
           onPress={() => router.push('/settings/collections')}
+        />
+        <SettingsRow
+          icon="sparkles-outline"
+          title={vi.habits.title}
+          summary={habits ? vi.habits.rowSummary(habits.profile.completedSample, habits.vocab.length) : null}
+          onPress={() => router.push('/settings/habits')}
         />
         <Card>
           <AppText variant="meta" tone="muted">

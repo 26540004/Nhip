@@ -25,6 +25,9 @@ const TABLES: Record<string, string> = {
   class_sessions: '*',
   schedule_exceptions: '*',
   capacity_settings: '*',
+  habit_settings: 'learning_enabled, answers, updated_at',
+  vocab_entries: 'id, short, meaning, collection_id, source, created_at',
+  ai_corrections: 'id, input_text, field, ai_value, user_value, created_at',
   reminder_settings: '*',
   google_connections: 'google_email, target_calendar_id, read_calendar_ids, status, last_synced_at',
 };

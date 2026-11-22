@@ -62,6 +62,7 @@ export interface TaskRow {
   priority: 1 | 2 | 3;
   status: string;
   created_at: string;
+  collection_id?: string | null;
 }
 
 export interface BlockRow {
@@ -80,6 +81,10 @@ export interface PlanInputs {
   /** accepted / synced / conflict blocks */
   blocks: BlockRow[];
   busy: Interval[];
+  /** Habit profile: how much longer this user's tasks really take (1 = as estimated). */
+  estimateFactor?: (t: TaskRow) => number;
+  /** Habit summary appended to the AI prompt. */
+  habitsText?: string;
   rules: {
     workHours: SlotContext['workHours'];
     studyWindows: SlotContext['studyWindows'];
@@ -160,7 +165,9 @@ export function buildPlanContext(input: PlanInputs, maxTasks = 25): PlanContext 
     if (request.rebalance_date && !releasedTaskIds.has(t.id)) continue;
     const deadlineIso = t.deadline_at ?? parent?.deadline_at ?? null;
     const deadline = deadlineIso ? Date.parse(deadlineIso) : null;
-    const remaining = Math.round((t.estimate_minutes ?? DEFAULT_ESTIMATE) - (scheduled.get(t.id) ?? 0));
+    // Learned overrun: a user whose study tasks take 1.4× gets 1.4× the time planned.
+    const factor = t.estimate_minutes != null ? (input.estimateFactor?.(t) ?? 1) : 1;
+    const remaining = Math.round(((t.estimate_minutes ?? DEFAULT_ESTIMATE) * factor) / 5) * 5 - Math.round(scheduled.get(t.id) ?? 0);
     if (remaining <= 0) continue;
     originalDeadline.set(t.id, deadline);
     candidates.push({
@@ -225,7 +232,10 @@ export function buildPlanContext(input: PlanInputs, maxTasks = 25): PlanContext 
 
 const localStr = (t: Instant, tz: string) => `${dateKeyOf(t, tz)}T${hhmmOf(t, tz)}`;
 
-export function buildPlanPrompt(pc: PlanContext, input: Pick<PlanInputs, 'capacity' | 'privacyMode'>): { system: string; user: string } {
+export function buildPlanPrompt(
+  pc: PlanContext,
+  input: Pick<PlanInputs, 'capacity' | 'privacyMode' | 'habitsText'>,
+): { system: string; user: string } {
   const engine = new PlacementEngine({ ctx: pc.ctx, capacity: input.capacity, existingBlocks: pc.existing });
   const tz = pc.ctx.tz!;
   const slots = (space: Space) =>
@@ -261,7 +271,7 @@ export function buildPlanPrompt(pc: PlanContext, input: Pick<PlanInputs, 'capaci
     '- reason: ONE short Vietnamese sentence (≤ 12 words) explaining why this slot (e.g. "Hạn thứ 6, ưu tiên cao, buổi sáng còn trống").',
     '- summary: 1–2 short Vietnamese sentences describing the plan (e.g. "Tuần này có 3 deadline. Mình chia báo cáo Mạng thành 3 buổi tối.").',
   ].join('\n');
-  return { system, user: JSON.stringify(payload) };
+  return { system: system + (input.habitsText ?? ''), user: JSON.stringify(payload) };
 }
 
 // ---------------------------------------------------------------------------

@@ -7,6 +7,7 @@
  * Privacy mode: only title, estimate, deadline and existing step titles are sent (no description).
  * Nothing is logged except counts and timing.
  */
+import { loadHabits } from '../_shared/habits-store.ts';
 import { AIError, generateStructured, SchemaError } from '../_shared/ai-provider.ts';
 import { aiProviders, consumeAiCall, getUser } from '../_shared/context.ts';
 import { corsHeaders, errorResponse, json, log } from '../_shared/http.ts';
@@ -62,10 +63,12 @@ Deno.serve(async (req) => {
   };
 
   try {
+    const habits = await loadHabits(db, tz, ctx.privacy);
+    const prompt = splitPrompt(ctx);
     const res = await generateStructured(
       providers,
       AiSplit,
-      { ...splitPrompt(ctx), maxOutputTokens: 1024 },
+      { ...prompt, system: prompt.system + habits.prompt('split'), maxOutputTokens: 1024 },
       { timeoutMs: 20_000, log: (e) => log(FN, e) },
     );
     const steps = normalizeSplit(res.data, ctx);

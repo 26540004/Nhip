@@ -10,6 +10,7 @@
  * time slots. Logs never contain titles.
  */
 import { AIError, generateStructured, SchemaError } from '../_shared/ai-provider.ts';
+import { loadHabits } from '../_shared/habits-store.ts';
 import { aiProviders, consumeAiCall, getUser, serviceClient } from '../_shared/context.ts';
 import { corsHeaders, errorResponse, json, log } from '../_shared/http.ts';
 import { viCore } from '../_shared/planning/strings.ts';
@@ -47,7 +48,7 @@ Deno.serve(async (req) => {
     db.from('profiles').select('timezone, ai_privacy_mode').eq('id', user.id).single(),
     db
       .from('tasks')
-      .select('id, parent_task_id, title, space, deadline_at, estimate_minutes, priority, status, created_at')
+      .select('id, parent_task_id, title, space, deadline_at, estimate_minutes, priority, status, created_at, collection_id')
       .in('status', ['todo', 'doing'])
       .limit(1000),
     db
@@ -76,10 +77,13 @@ Deno.serve(async (req) => {
   // All blocks already in the app (incl. ones we will not touch) count for "remaining minutes".
   const allBlocks = (blocks.data ?? []) as BlockRow[];
 
+  const habits = await loadHabits(db, tz, privacyMode, now);
   const input: PlanInputs = {
     now,
     tz,
     request,
+    estimateFactor: (t) => habits.factor({ space: t.space, collection_id: t.collection_id ?? null }),
+    habitsText: habits.prompt('plan'),
     tasks: (tasks.data ?? []) as TaskRow[],
     blocks: allBlocks,
     busy: (busy.data ?? []).map((b) => ({ start: Date.parse(b.start_at), end: Date.parse(b.end_at) })),

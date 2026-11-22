@@ -301,6 +301,13 @@ describe('parse-task pipeline fixtures', () => {
     expect(out.tasks[1]!.deadline_at).toBeNull();
   });
 
+  it('a learned nickname beats the AI guess (habit profile)', () => {
+    const ai = AiParseResponse.parse({ tasks: [{ title: 'Nộp bt mmt', space: 'work', collection_name: 'Website Kim Long', priority: 2 }] });
+    const alias = (t: string) => (/\bmmt\b/i.test(t) ? { collection_id: 'c-mang' } : null);
+    const out = finalizeParse(ai, { text: 'nộp bt mmt', now: NOW, tz: TZ, collections: COLS, url: null, provider: 'mock', alias });
+    expect(out.tasks[0]).toMatchObject({ collection_id: 'c-mang', space: 'study', space_uncertain: false });
+  });
+
   it('prompt contains the collections and current time, not secrets', () => {
     const p = buildPrompt({
       text: 'mai gọi khách',

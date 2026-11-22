@@ -21,7 +21,7 @@ import { SpaceFilterControl } from '../../components/SpaceFilterControl';
 import { TaskRow } from '../../components/TaskRow';
 import { useNow } from '../../hooks/useNow';
 import { useSync } from '../../hooks/useSync';
-import { MorningBriefCard, NotificationPromptCard } from '../brief/TodayCards';
+import { HabitsPromptCard, MorningBriefCard, NotificationPromptCard } from '../brief/TodayCards';
 import { AiPlanButton } from '../plan/AiPlanButton';
 import { useStartPlan } from '../plan/useStartPlan';
 import { vi } from '../../i18n/vi';
@@ -158,6 +158,7 @@ export function TodayScreen() {
         </Card>
       )}
       <NotificationPromptCard />
+      <HabitsPromptCard />
       <MorningBriefCard />
       <SpaceFilterControl screen="today" />
 

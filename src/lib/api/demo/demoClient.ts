@@ -13,7 +13,9 @@ import {
   ProposePlanRequest,
   type TaskRow,
 } from '../../../../supabase/functions/_shared/propose-plan-core.ts';
+import { estimateFactor } from '../../../../supabase/functions/_shared/habits-core.ts';
 import { normalizeVi } from '../../../../supabase/functions/_shared/vi-parse.ts';
+import { applyDemoAlias, demoHabitProfile, demoLearnStyle } from './demoHabits';
 import { vi } from '../../../i18n/vi';
 import { rulesFromSettings } from '../../settings/rules';
 import type { SettingsBundle } from '../queries';
@@ -87,6 +89,8 @@ function proposePlanLocal(body: unknown) {
     },
     capacity: rules.capacity,
     privacyMode: false,
+    estimateFactor: (task) =>
+      estimateFactor(demoHabitProfile(demoDb, rules.tz, now), { space: task.space, collection_id: task.collection_id ?? null }),
   };
   const pc = buildPlanContext(input);
   if (pc.tasks.length === 0) return fnError('no_tasks', 422);
@@ -180,12 +184,16 @@ export function createDemoClient() {
             name: string;
             space: 'study' | 'work';
           }[];
-          return { data: demoParse(text, cols, Date.now(), 'Asia/Ho_Chi_Minh'), error: null };
+          return { data: applyDemoAlias(demoDb, demoParse(text, cols, Date.now(), 'Asia/Ho_Chi_Minh'), text), error: null };
         }
         if (name === 'propose-plan') return proposePlanLocal(opts.body);
         if (name === 'link-preview') {
           const p = demoLinkPreview(String(opts.body?.url ?? ''));
           return p ? { data: p, error: null } : fnError('link_blocked', 422);
+        }
+        if (name === 'learn-style') {
+          const r = demoLearnStyle(demoDb, opts.body ?? {});
+          return r.error ? fnError(r.error, r.status) : { data: r.data, error: null };
         }
         if (name === 'transcribe-audio' || name === 'note-ai' || name === 'split-task') {
           const body = opts.body ?? {};

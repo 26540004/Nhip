@@ -19,6 +19,7 @@ Ba vấn đề cốt lõi: dồn quá nhiều việc vào một ngày → giới
 | **4. Nhắc nhở** | Nhắc trước giờ bắt đầu khối (thông báo cục bộ, tối đa 50, nút "Bắt đầu" / "Hoãn 15 phút"), đăng ký push token, `push-dispatch` (tóm tắt sáng, tổng kết tối, nhắc hạn chót, giờ yên lặng, chống gửi trùng), màn `/brief`, `/review`, thẻ tóm tắt trên Hôm nay, Cài đặt → Nhắc nhở | ✅ Xong |
 | **5. Ghi âm & Ghi chú giàu nội dung** | Trình soạn thảo khối (tiêu đề, đậm/nghiêng, danh sách, checklist → việc), ảnh (nén 1920 px, thumbnail, xem phóng to), thẻ liên kết (`link-preview`, chống SSRF), ghi âm nền chia đoạn 10 phút + tải lên nền + phát lại có đánh dấu, `transcribe-audio` (từng đoạn, thử lại, tóm tắt, bài tập → việc), `note-ai` (tóm tắt ghi chú, tìm việc), ảnh & ghi âm trong chi tiết việc | ✅ Xong |
 | **6. Hoàn thiện** | Onboarding 5 bước, Cài đặt đầy đủ (giờ hành chính, thời khóa biểu + ngoại lệ, khung giờ học, sức chứa, dữ liệu), xuất dữ liệu .zip, "✦ Chia nhỏ việc này" (`split-task`), script seed, icon riêng, rà soát giao diện/trợ năng/ngoại tuyến, QA lập lịch trên dữ liệu seed | ✅ Xong (còn QA trên iPhone thật — xem mục "Đã kiểm chứng") |
+| **7. Nhịp hiểu về bạn** | Hồ sơ thói quen (tỉ lệ thời gian thật/dự kiến, giờ hay làm, từ viết tắt, các lần sửa AI) dùng cho mọi hàm AI; 3 cách khởi động nhanh (2 câu hỏi, nhập ghi chú cũ qua `learn-style`, sửa trực tiếp); cài web như ứng dụng (PWA) | ✅ Xong |
 
 
 ---
@@ -112,6 +113,19 @@ Tệp `nhip-du-lieu-YYYYMMDD-HHmm.zip` (trên iPhone mở bảng chia sẻ, trê
 
 Trong chi tiết việc: AI (`split-task`) đề xuất 2–7 bước cụ thể. Code dọn kết quả: bỏ bước trùng (kể cả trùng việc con đã có), mỗi bước 10–90 phút (bội số 5), và nếu việc có ước tính thì co giãn cho khớp phần chưa có việc con. Bạn sửa tên, đổi thời lượng, bỏ bước rồi bấm **Tạo n việc con** (nguồn `ai_split`). Chế độ riêng tư: AI chỉ nhận tiêu đề, thời lượng, hạn chót — không nhận mô tả.
 
+## Nhịp hiểu về bạn (hồ sơ thói quen)
+
+Không cần huấn luyện mô hình: Nhịp học từ chính dữ liệu của bạn và đưa phần tóm tắt vào **mọi** lần gọi AI (Quick Add, xếp lịch, chia nhỏ việc, tóm tắt/tìm việc trong ghi chú). Quy tắc lịch vẫn luôn thắng.
+
+| Nhịp học gì | Từ đâu | Dùng thế nào |
+|---|---|---|
+| Thời gian thật so với dự kiến (theo không gian và theo môn/dự án) | Thời gian thật bạn ghi ở bước tổng kết tối (`actual_minutes`), 120 ngày gần nhất | Xếp lịch nhân thời lượng theo tỉ lệ (code tính, 0,6×–2,2×). Ít dữ liệu thì kéo về câu trả lời của bạn |
+| Giờ hay làm | Giờ bạn bấm "Xong", 60 ngày gần nhất, theo khung 2 giờ | Gợi ý cho AI ưu tiên các khung đó |
+| Từ viết tắt & biệt danh môn/dự án (`mmt` = Mạng máy tính) | Bạn thêm · nhập ghi chú cũ · tự học khi bạn sửa môn sau Quick Add | Biệt danh khớp nguyên từ thì **code** gán đúng môn, đè lên đoán của AI |
+| Các lần bạn sửa AI | So gợi ý của AI với cái bạn lưu trong Quick Add (giữ 30 lần gần nhất) | Đưa lại cho AI làm ví dụ (tắt khi bật chế độ riêng tư) |
+
+Khởi động nhanh: thẻ **"Giúp Nhịp hiểu bạn nhanh hơn"** trên Hôm nay → 2 câu hỏi (hay trễ giờ? tập trung lúc nào?); hoặc Cài đặt → **Nhịp hiểu về bạn** → dán ghi chú cũ (`learn-style` chỉ đề xuất, bạn chọn từ nào giữ; nội dung dán không được lưu). Trang này cho xem, sửa, tắt học hoặc xoá toàn bộ hồ sơ. Bảng: `habit_settings`, `vocab_entries`, `ai_corrections` (migration 006, RLS theo người dùng, có trong file xuất dữ liệu).
+
 ## Dữ liệu mẫu (seed)
 
 ```bash
@@ -124,12 +138,13 @@ Tạo: 2 môn học (Mạng máy tính, Cơ sở dữ liệu), 2 dự án (Websi
 ## Đã kiểm chứng (QA)
 
 Tự động, chạy lại được:
-- **Jest**: ngày giờ tiếng Việt, khung trống, sức chứa, `validatePlan`/`greedyPlan`, lập lịch thông báo (giới hạn 64), mô hình ghi chú, link preview + SSRF, phiên âm, hàng đợi tải lên, cài đặt giờ giấc, xuất dữ liệu, chia nhỏ việc.
-- **Postgres thật** (`scripts/db-check`): migrations + RLS, tìm kiếm không dấu, giới hạn lượt AI, Vault.
+- **Jest**: ngày giờ tiếng Việt, khung trống, sức chứa, `validatePlan`/`greedyPlan`, lập lịch thông báo (giới hạn 64), mô hình ghi chú, link preview + SSRF, phiên âm, hàng đợi tải lên, cài đặt giờ giấc, xuất dữ liệu, chia nhỏ việc, hồ sơ thói quen.
+- **Postgres thật** (`scripts/db-check`): migrations + RLS, tìm kiếm không dấu, giới hạn lượt AI, Vault, hồ sơ thói quen (RLS, biệt danh không trùng, tự cắt còn 30 lần sửa).
 - **Đầu-cuối trên dữ liệu seed** (PostgREST + Edge Functions thật, AI giả lập):
   - AI cố tình đề xuất 40 khối sai (Việc lúc 20:00 và giờ nghỉ trưa, Học trùng giờ lên lớp/giờ hành chính, khối 3,5 giờ) → sau khi code kiểm tra: **0 khối Việc ngoài giờ hành chính hay trong giờ nghỉ trưa, 0 khối Học trùng giờ học hoặc giờ hành chính**, không chồng lấn, đệm ≥ 10 phút, không khối nào sau hạn chót.
   - Việc 6 giờ hạn 10:00 sáng mai → cảnh báo rõ "không đủ thời gian", không âm thầm bỏ.
   - Gemini trả 429 → Quick Add tự chuyển sang Groq, người dùng không thấy lỗi.
+  - Hồ sơ thói quen: AI đoán sai dự án cho "nộp bt mmt" → biệt danh đã học sửa thành Mạng máy tính; người dùng hay làm lâu 1,45× → việc 60 phút được xếp 90 phút; tắt học → xếp đúng 60 phút và prompt không còn hồ sơ; chế độ riêng tư → câu người dùng từng gõ không rời máy chủ, `learn-style` trả 403.
   - Chế độ riêng tư bật → không request nào tới AI chứa nội dung ghi chú hay mô tả việc; tóm tắt ghi chú/phiên âm bị từ chối.
 - **Giao diện**: mọi màn hình ở 320/375/440 pt và 1280 px — không lỗi console, không tràn ngang, mọi nút có nhãn trợ năng; trạng thái ngoại tuyến hiển thị đúng.
 
@@ -283,6 +298,7 @@ cd scripts/db-check && npm install && npm run check   # migrations + RLS trên P
    npx supabase functions deploy transcribe-audio
    npx supabase functions deploy note-ai
    npx supabase functions deploy split-task
+   npx supabase functions deploy learn-style
    ```
    Lấy key Gemini miễn phí tại aistudio.google.com, key Groq tại console.groq.com. Đặt `GEMINI_MODEL` là model Flash miễn phí mới nhất đang có trong AI Studio (cần nhận âm thanh); `GROQ_MODEL` là một model chat hỗ trợ JSON mode; `GROQ_STT_MODEL` là model Whisper của Groq (dự phòng phiên âm, bỏ trống = không dự phòng).
 
@@ -340,6 +356,8 @@ Cấu hình iOS trong `app.config.ts`: chế độ nền `audio` (ghi âm khi kh
 npm run export:web          # xuất ra dist/
 ```
 Đưa thư mục `dist/` lên Netlify / Vercel / Cloudflare Pages (cấu hình SPA: mọi đường dẫn → `index.html`). Đặt biến `EXPO_PUBLIC_*` trước khi export.
+
+**Cài như ứng dụng:** `public/manifest.json` + `public/sw.js` làm web cài được — Chrome/Edge trên máy tính hiện nút **Cài đặt** trên thanh địa chỉ, Android "Thêm vào màn hình chính", iPhone Safari → Chia sẻ → **Thêm vào Màn hình chính**. Service worker không lưu đệm gì (tránh giữ bản cũ sau khi cập nhật); dùng ngoại tuyến vẫn nhờ hàng đợi ghi của app.
 
 Trên web, ghi âm dài và thông báo cục bộ bị giới hạn — app sẽ hiển thị "Ghi âm dài nên dùng trên iPhone".
 

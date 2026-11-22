@@ -9,6 +9,7 @@
  * (titles, durations, deadlines, times). Note content is never read here. Content is never logged.
  */
 import { AIError, generateStructured, SchemaError } from '../_shared/ai-provider.ts';
+import { loadHabits } from '../_shared/habits-store.ts';
 import { aiProviders, consumeAiCall, getUser } from '../_shared/context.ts';
 import { corsHeaders, errorResponse, json, log } from '../_shared/http.ts';
 import {
@@ -43,7 +44,7 @@ Deno.serve(async (req) => {
   }
 
   const [profileRes, colsRes, hoursRes] = await Promise.all([
-    db.from('profiles').select('timezone').eq('id', user.id).single(),
+    db.from('profiles').select('timezone, ai_privacy_mode').eq('id', user.id).single(),
     db.from('collections').select('id, name, space').eq('archived', false),
     db.from('work_hours').select('weekday, start_time, end_time, enabled').order('weekday'),
   ]);
@@ -64,14 +65,23 @@ Deno.serve(async (req) => {
   const { url, rest } = extractUrl(body.text);
   const weekday = new Intl.DateTimeFormat('en-US', { timeZone: tz, weekday: 'short' }).format(now);
   const weekdayVi = WEEKDAYS_VI[['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(weekday)] ?? '';
-  const prompt = buildPrompt({ text: rest || body.text, nowIso: formatIsoTz(now, tz), weekdayVi, tz, collections, officeHoursSummary });
+  const habits = await loadHabits(db, tz, Boolean(profileRes.data?.ai_privacy_mode), now);
+  const prompt = buildPrompt({
+    text: rest || body.text,
+    nowIso: formatIsoTz(now, tz),
+    weekdayVi,
+    tz,
+    collections,
+    officeHoursSummary,
+    habitsText: habits.prompt('parse'),
+  });
 
   try {
     const res = await generateStructured(providers, AiParseResponse, prompt, {
       timeoutMs: 15_000,
       log: (e) => log(FN, e),
     });
-    const out = finalizeParse(res.data, { text: rest, now, tz, collections, url, provider: res.provider });
+    const out = finalizeParse(res.data, { text: rest, now, tz, collections, url, provider: res.provider, alias: habits.alias });
     log(FN, { event: 'done', provider: res.provider, tasks: out.tasks.length, chars: body.text.length, ms: Date.now() - started });
     return json(out);
   } catch (e) {
