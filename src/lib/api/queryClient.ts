@@ -1,11 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister';
-import { focusManager, onlineManager, QueryClient } from '@tanstack/react-query';
+import { focusManager, MutationCache, onlineManager, QueryCache, QueryClient } from '@tanstack/react-query';
 import { AppState, Platform } from 'react-native';
+import { reportException } from '../errors/reporter';
 import { registerMutationDefaults } from './mutations';
 
 export const queryClient = new QueryClient({
+  // Admin only: unexpected read/write failures go to "Claude tự sửa lỗi" (no-op for everyone else).
+  queryCache: new QueryCache({ onError: (e) => reportException(e) }),
+  mutationCache: new MutationCache({ onError: (e) => reportException(e) }),
   defaultOptions: {
     queries: {
       staleTime: 30_000,

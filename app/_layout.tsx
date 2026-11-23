@@ -22,6 +22,9 @@ import { useKeyboardShortcuts } from '../src/hooks/useKeyboardShortcuts';
 import { useNotifications } from '../src/hooks/useNotifications';
 import { useAutoSync } from '../src/hooks/useSync';
 import { useSettings } from '../src/lib/api/queries';
+import { useAdminReporter } from '../src/lib/errors/useAdmin';
+import { CrashScreen } from '../src/features/settings/CrashScreen';
+import type { ErrorBoundaryProps } from 'expo-router';
 import { QUERY_CACHE_BUSTER, queryClient, queryPersister } from '../src/lib/api/queryClient';
 import { isSupabaseConfigured } from '../src/lib/api/supabase';
 import { ThemeProvider } from '../src/theme/ThemeProvider';
@@ -41,6 +44,11 @@ const navTheme = {
     primary: darkColors.primary,
   },
 };
+
+/** Last resort when a screen crashes: report it (admin only) and offer a retry. */
+export function ErrorBoundary(props: ErrorBoundaryProps) {
+  return <CrashScreen {...props} />;
+}
 
 export default function RootLayout() {
   const [fontsLoaded, fontError] = useFonts({ Inter_400Regular, Inter_500Medium, Inter_600SemiBold, Inter_700Bold });
@@ -108,6 +116,7 @@ function AppNavigator({ signedIn }: { signedIn: boolean }) {
   const profile = settings.data?.profile;
   const needsOnboarding = signedIn && profile != null && !profile.onboarding_completed_at;
   const pathname = usePathname();
+  useAdminReporter(signedIn);
   // Deep links / redirects to a protected page while onboarding is pending land on step 2.
   useEffect(() => {
     if (needsOnboarding && !pathname.startsWith('/onboarding'))
@@ -137,6 +146,7 @@ function AppNavigator({ signedIn }: { signedIn: boolean }) {
         <Stack.Screen name="settings/capacity" />
         <Stack.Screen name="settings/data" />
         <Stack.Screen name="settings/habits" />
+        <Stack.Screen name="settings/claude" />
         <Stack.Screen name="plan" options={{ presentation: 'modal' }} />
         <Stack.Screen name="brief" />
         <Stack.Screen name="review" />

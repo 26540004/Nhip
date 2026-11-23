@@ -1,0 +1,84 @@
+# After a PR is merged and CI passes on main: database migrations, Edge Functions, web app.
+# Each part runs only when its secrets exist (see README "Claude tự sửa lỗi" → setup).
+# The iPhone app itself still updates through EAS Build / TestFlight.
+name: Deploy
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+jobs:
+  supabase:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Skip when not configured
+        id: cfg
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$PROJECT_REF" ] || [ -z "$SUPABASE_DB_PASSWORD" ]; then
+            echo "Supabase secrets not set — skipping."; echo "run=false" >> "$GITHUB_OUTPUT"
+          else echo "run=true" >> "$GITHUB_OUTPUT"; fi
+      - uses: supabase/setup-cli@v1
+        if: steps.cfg.outputs.run == 'true'
+        with:
+          version: latest
+      - name: Migrations
+        if: steps.cfg.outputs.run == 'true'
+        run: |
+          supabase link --project-ref "$PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+          supabase db push --password "$SUPABASE_DB_PASSWORD"
+      - name: Edge Functions
+        if: steps.cfg.outputs.run == 'true'
+        run: |
+          for f in parse-task propose-plan gcal-sync push-dispatch link-preview transcribe-audio note-ai split-task learn-style report-error; do
+            supabase functions deploy "$f" --project-ref "$PROJECT_REF"
+          done
+          # Google's OAuth redirect carries no JWT; the function verifies the request itself.
+          supabase functions deploy gcal-auth --no-verify-jwt --project-ref "$PROJECT_REF"
+
+  web:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+      EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID }}
+      # Public values (the anon key is meant to be public; RLS protects the data).
+      EXPO_PUBLIC_SUPABASE_URL: ${{ vars.EXPO_PUBLIC_SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ vars.EXPO_PUBLIC_SUPABASE_ANON_KEY }}
+      EXPO_PUBLIC_GITHUB_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Skip when not configured
+        id: cfg
+        run: |
+          if [ -z "$EXPO_TOKEN" ] || [ -z "$EXPO_PUBLIC_SUPABASE_URL" ] || [ -z "$EAS_PROJECT_ID" ]; then
+            echo "Expo token / variables not set — skipping."; echo "run=false" >> "$GITHUB_OUTPUT"
+          else echo "run=true" >> "$GITHUB_OUTPUT"; fi
+      - uses: actions/setup-node@v4
+        if: steps.cfg.outputs.run == 'true'
+        with:
+          node-version: 22
+          cache: npm
+      - if: steps.cfg.outputs.run == 'true'
+        run: npm ci
+      - if: steps.cfg.outputs.run == 'true'
+        run: npx expo export --platform web
+      - if: steps.cfg.outputs.run == 'true'
+        run: npx eas-cli@latest deploy --prod --non-interactive

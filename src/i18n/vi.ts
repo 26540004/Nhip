@@ -522,6 +522,32 @@ export const vi = {
     version: (v: string) => `Nhịp ${v}`,
   },
 
+  claudeFix: {
+    title: 'Claude tự sửa lỗi',
+    rowSummary: (on: boolean) => (on ? 'Đang bật · chỉ tài khoản quản trị' : 'Đang tắt'),
+    intro:
+      'Khi Nhịp gặp lỗi, một bản báo cáo đã lược bỏ thông tin cá nhân được gửi lên GitHub. Claude (gói Pro của bạn) tìm nguyên nhân, sửa, thêm test và mở yêu cầu gộp (PR) để bạn duyệt. Bạn bấm Merge thì bản mới tự triển khai.',
+    adminOnly: 'Chỉ tài khoản quản trị mới dùng được tính năng này.',
+    auto: 'Tự gửi báo lỗi',
+    autoHelp:
+      'Gửi lỗi bất ngờ (app treo, lỗi máy chủ, lỗi lưu dữ liệu). Không gửi nội dung ghi chú, việc, email hay mã định danh. Mất mạng, AI hết lượt… không tính là lỗi.',
+    manualTitle: 'Báo lỗi cho Claude',
+    manualHelp: 'Mô tả bạn đã làm gì và thấy gì. Đừng ghi nội dung riêng tư — Nhịp vẫn tự lược email, số điện thoại, đoạn trích dài.',
+    manualPh: 'vd. Ở màn Lịch, bấm "AI xếp lịch" thì quay mãi không xong…',
+    send: 'Gửi cho Claude',
+    sentIssue: (n: number) => `Đã gửi — issue #${n} trên GitHub`,
+    sentStored: 'Đã lưu báo lỗi. Sẽ lên GitHub khi kho được đặt Riêng tư và có token.',
+    sendFailed: 'Chưa gửi được (cần mạng).',
+    openGithub: 'Xem các lỗi trên GitHub',
+    privacy: 'Báo lỗi chỉ tạo issue khi kho GitHub để Riêng tư.',
+  },
+  crash: {
+    title: 'Có lỗi xảy ra',
+    body: 'Màn hình này gặp sự cố. Dữ liệu của bạn vẫn an toàn — thay đổi chưa đồng bộ vẫn được giữ.',
+    reported: 'Đã gửi báo lỗi cho Claude.',
+    retry: 'Thử lại',
+    home: 'Về Hôm nay',
+  },
   habits: {
     title: 'Nhịp hiểu về bạn',
     rowSummary: (n: number, vocab: number) =>

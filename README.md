@@ -20,6 +20,7 @@ Ba vấn đề cốt lõi: dồn quá nhiều việc vào một ngày → giới
 | **5. Ghi âm & Ghi chú giàu nội dung** | Trình soạn thảo khối (tiêu đề, đậm/nghiêng, danh sách, checklist → việc), ảnh (nén 1920 px, thumbnail, xem phóng to), thẻ liên kết (`link-preview`, chống SSRF), ghi âm nền chia đoạn 10 phút + tải lên nền + phát lại có đánh dấu, `transcribe-audio` (từng đoạn, thử lại, tóm tắt, bài tập → việc), `note-ai` (tóm tắt ghi chú, tìm việc), ảnh & ghi âm trong chi tiết việc | ✅ Xong |
 | **6. Hoàn thiện** | Onboarding 5 bước, Cài đặt đầy đủ (giờ hành chính, thời khóa biểu + ngoại lệ, khung giờ học, sức chứa, dữ liệu), xuất dữ liệu .zip, "✦ Chia nhỏ việc này" (`split-task`), script seed, icon riêng, rà soát giao diện/trợ năng/ngoại tuyến, QA lập lịch trên dữ liệu seed | ✅ Xong (còn QA trên iPhone thật — xem mục "Đã kiểm chứng") |
 | **7. Nhịp hiểu về bạn** | Hồ sơ thói quen (tỉ lệ thời gian thật/dự kiến, giờ hay làm, từ viết tắt, các lần sửa AI) dùng cho mọi hàm AI; 3 cách khởi động nhanh (2 câu hỏi, nhập ghi chú cũ qua `learn-style`, sửa trực tiếp); cài web như ứng dụng (PWA) | ✅ Xong |
+| **8. Claude tự sửa lỗi** | Chỉ admin: báo lỗi đã lược thông tin cá nhân → issue GitHub (kho riêng tư) → Claude Code (gói Pro) sửa và mở PR → duyệt → CI → tự triển khai. Âm thanh tự xoá 14 ngày sau khi chép lời | ✅ Xong (cần cài đặt một lần, xem mục dưới) |
 
 
 ---
@@ -125,6 +126,29 @@ Không cần huấn luyện mô hình: Nhịp học từ chính dữ liệu củ
 | Các lần bạn sửa AI | So gợi ý của AI với cái bạn lưu trong Quick Add (giữ 30 lần gần nhất) | Đưa lại cho AI làm ví dụ (tắt khi bật chế độ riêng tư) |
 
 Khởi động nhanh: thẻ **"Giúp Nhịp hiểu bạn nhanh hơn"** trên Hôm nay → 2 câu hỏi (hay trễ giờ? tập trung lúc nào?); hoặc Cài đặt → **Nhịp hiểu về bạn** → dán ghi chú cũ (`learn-style` chỉ đề xuất, bạn chọn từ nào giữ; nội dung dán không được lưu). Trang này cho xem, sửa, tắt học hoặc xoá toàn bộ hồ sơ. Bảng: `habit_settings`, `vocab_entries`, `ai_corrections` (migration 006, RLS theo người dùng, có trong file xuất dữ liệu).
+
+## Claude tự sửa lỗi (chỉ tài khoản quản trị)
+
+Luồng: app của **admin** gặp lỗi bất ngờ (treo màn hình, hàm máy chủ trả 5xx, ghi dữ liệu thất bại) hoặc admin bấm **Cài đặt → Claude tự sửa lỗi → Gửi cho Claude** → hàm `report-error` lược bỏ email, số điện thoại, mã định danh, token, đoạn trích nội dung → gộp lỗi trùng theo dấu vân tay → tạo **issue** nhãn `auto-bug` có `@claude` → workflow `.github/workflows/claude.yml` chạy **Claude Code bằng gói Pro của bạn** → tái hiện bằng test, sửa, `npm run check`, mở **PR** (không tự gộp) → bạn duyệt và bấm Merge → `ci.yml` chạy kiểm tra → `deploy.yml` tự triển khai migrations, Edge Functions và bản web. App iPhone vẫn cập nhật qua EAS Build/TestFlight.
+
+Người dùng khác: không thấy mục này, không gửi gì; máy chủ trả 403. Issue **chỉ được tạo khi kho GitHub để Riêng tư** — kho công khai thì báo lỗi chỉ lưu trong bảng `error_reports`. Mất mạng, AI hết lượt, lỗi 4xx không tính là lỗi. Tối đa 30 báo cáo/giờ, 15/phiên; lỗi lặp chỉ bình luận ở lần 2, 5, 20, 100. Hướng dẫn cho Claude nằm trong `CLAUDE.md`.
+
+### Cài đặt một lần (làm trên máy bạn — đừng dán token vào chat)
+
+1. **Chuyển kho sang Riêng tư:** GitHub → Settings → General → Danger Zone → Change visibility → Private.
+2. **Đặt mình là admin** — Supabase → SQL Editor (lấy user ID ở Authentication → Users):
+   ```sql
+   insert into public.app_admins(user_id) values ('<user-id-của-bạn>');
+   ```
+3. **Cho Claude chạy trên GitHub bằng gói Pro:** cài [Claude GitHub App](https://github.com/apps/claude) vào kho; trên máy có Claude Code chạy `claude setup-token`, rồi lưu token vào GitHub → Settings → Secrets and variables → Actions → secret `CLAUDE_CODE_OAUTH_TOKEN`. (Hoặc chạy `/install-github-app` trong Claude Code — nó làm cả hai bước.)
+4. **Cho app tạo issue:** tạo fine-grained token (GitHub → Settings → Developer settings → Fine-grained tokens) chỉ cho kho này, quyền **Issues: Read and write** (Metadata: Read tự có). Lưu vào Supabase:
+   ```bash
+   npx supabase secrets set GITHUB_ISSUES_TOKEN=<token> GITHUB_REPO=<owner>/<repo>
+   npx supabase db push && npx supabase functions deploy report-error
+   ```
+5. **Tự triển khai sau khi Merge** — GitHub Actions secrets: `SUPABASE_ACCESS_TOKEN` (supabase.com → Account → Access Tokens), `SUPABASE_PROJECT_REF`, `SUPABASE_DB_PASSWORD`, `EXPO_TOKEN` (expo.dev → Access tokens); variables: `EXPO_PUBLIC_SUPABASE_URL`, `EXPO_PUBLIC_SUPABASE_ANON_KEY`, `EAS_PROJECT_ID`. Thiếu phần nào thì bước đó tự bỏ qua.
+
+Gói Pro dùng chung hạn mức giữa Claude và Claude Code, nên mỗi lần Claude sửa lỗi sẽ trừ vào hạn mức đó (workflow giới hạn 60 lượt, 45 phút mỗi lần chạy).
 
 ## Dữ liệu mẫu (seed)
 
@@ -304,6 +328,7 @@ cd scripts/db-check && npm install && npm run check   # migrations + RLS trên P
    npx supabase functions deploy note-ai
    npx supabase functions deploy split-task
    npx supabase functions deploy learn-style
+   npx supabase functions deploy report-error
    ```
    Lấy key Gemini miễn phí tại aistudio.google.com, key Groq tại console.groq.com. Đặt `GEMINI_MODEL` là model Flash miễn phí mới nhất đang có trong AI Studio (cần nhận âm thanh); `GROQ_MODEL` là một model chat hỗ trợ JSON mode; `GROQ_STT_MODEL` là model Whisper của Groq (dự phòng phiên âm, bỏ trống = không dự phòng).
 

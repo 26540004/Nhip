@@ -171,6 +171,8 @@ export function createDemoClient() {
     storage: demoStorage,
     rpc: async (fn: string, args: Record<string, unknown>) => {
       if (fn === 'search_all') return { data: searchLocal(String(args.q ?? '')), error: null };
+      // The demo user plays the admin so "Claude tự sửa lỗi" can be seen (reports go nowhere).
+      if (fn === 'is_admin') return { data: true, error: null };
       if (fn === 'storage_usage') {
         // Estimate: speech audio ~40 kbps, compressed photos ~350 KB.
         const atts = demoDb.table('attachments');
@@ -200,6 +202,7 @@ export function createDemoClient() {
           const p = demoLinkPreview(String(opts.body?.url ?? ''));
           return p ? { data: p, error: null } : fnError('link_blocked', 422);
         }
+        if (name === 'report-error') return { data: { fingerprint: '00000000', issue: null, stored: true }, error: null };
         if (name === 'learn-style') {
           const r = demoLearnStyle(demoDb, opts.body ?? {});
           return r.error ? fnError(r.error, r.status) : { data: r.data, error: null };

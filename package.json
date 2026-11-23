@@ -67,8 +67,10 @@
     "export:web": "expo export --platform web",
     "lint": "eslint .",
     "format": "prettier --write \"app/**/*.{ts,tsx}\" \"src/**/*.{ts,tsx}\" \"supabase/functions/**/*.ts\" scripts/eval-parse.ts",
-    "check:functions": "for f in parse-task propose-plan gcal-sync gcal-auth push-dispatch link-preview transcribe-audio note-ai split-task learn-style; do (cd supabase/functions/$f && deno check index.ts) || exit 1; done",
-    "build:demo": "node scripts/build-demo.mjs"
+    "check:functions": "for f in parse-task propose-plan gcal-sync gcal-auth push-dispatch link-preview transcribe-audio note-ai split-task learn-style report-error; do (cd supabase/functions/$f && deno check index.ts) || exit 1; done",
+    "build:demo": "node scripts/build-demo.mjs",
+    "format:check": "prettier --check \"app/**/*.{ts,tsx}\" \"src/**/*.{ts,tsx}\" \"supabase/functions/**/*.ts\"",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm test -- --ci && npm run check:functions"
   },
   "private": true,
   "jest": {

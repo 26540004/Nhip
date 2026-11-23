@@ -12,6 +12,7 @@ import { showToast } from '../../components/Toast';
 import { useNow } from '../../hooks/useNow';
 import { vi } from '../../i18n/vi';
 import { useHabits } from '../../lib/api/habits';
+import { useIsAdmin } from '../../lib/errors/useAdmin';
 import { useUpdateProfile } from '../../lib/api/mutations';
 import { useCollections, useGoogleConnection, useSettings } from '../../lib/api/queries';
 import { queryClient } from '../../lib/api/queryClient';
@@ -32,6 +33,7 @@ export function SettingsScreen() {
   const now = useNow();
   const updateProfile = useUpdateProfile();
   const habits = useHabits().data;
+  const isAdmin = useIsAdmin().data === true;
   const s = settings.data;
   const profile = s?.profile;
   // The counter resets per local day (see consume_ai_call).
@@ -134,6 +136,14 @@ export function SettingsScreen() {
           )}
           onPress={() => router.push('/settings/collections')}
         />
+        {isAdmin && (
+          <SettingsRow
+            icon="construct-outline"
+            title={vi.claudeFix.title}
+            summary={vi.claudeFix.rowSummary(true)}
+            onPress={() => router.push('/settings/claude')}
+          />
+        )}
         <SettingsRow
           icon="sparkles-outline"
           title={vi.habits.title}

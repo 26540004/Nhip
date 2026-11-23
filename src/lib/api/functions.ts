@@ -2,6 +2,7 @@
 import { onlineManager } from '@tanstack/react-query';
 import { ApiError, requireSupabase } from './supabase';
 import type { ParsedTask, ParseTaskResponse, TranscriptSummary } from './types';
+import { reportFunctionError } from '../errors/reporter';
 
 export async function invoke<T>(name: string, body: Record<string, unknown>): Promise<T> {
   if (!onlineManager.isOnline()) throw new ApiError('offline');
@@ -17,6 +18,7 @@ export async function invoke<T>(name: string, body: Record<string, unknown>): Pr
       } catch {
         /* non-JSON body */
       }
+      reportFunctionError(name, code, ctx.status, error.message);
       throw new ApiError(code, error.message, ctx.status);
     }
     throw new ApiError('network', error.message);

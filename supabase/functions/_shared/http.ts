@@ -20,6 +20,8 @@ export type ErrorCode =
   | 'ai_quota'
   | 'privacy_mode'
   | 'audio_deleted'
+  | 'not_admin'
+  | 'rate_limited'
   | 'not_found'
   | 'gcal_not_connected'
   | 'gcal_revoked'
