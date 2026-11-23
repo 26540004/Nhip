@@ -5,7 +5,6 @@ jest.mock('../lib/api/supabase', () => ({ requireSupabase: () => ({ functions: {
 jest.mock('@react-native-async-storage/async-storage', () => ({ getItem: jest.fn().mockResolvedValue(null), setItem: jest.fn() }));
 jest.mock('expo-constants', () => ({ expoConfig: { version: '1.2.3' } }));
 
-
 const flush = () => new Promise((r) => setTimeout(r, 0));
 
 describe('error reporter (admin only)', () => {
